@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-module fifo_tb;
+module fifo_tb_non_circular;
 
   // -------------------------------------------------------------
   // Parameters
