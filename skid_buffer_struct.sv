@@ -44,8 +44,8 @@ module skid_buffer_struct #(
             end else if (ready_out && valid_out) begin
                 ready_in_sig <= 1'b1;
                 valid_out_sig <= 1'b0;
-            end
-            
+            end else begin
+            end  
         end
     end
     
