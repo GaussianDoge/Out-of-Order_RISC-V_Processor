@@ -17,7 +17,7 @@ module decode(
     output logic[4:0] rs2,
     output logic [4:0] rd,
     output logic [31:0] imm,
-    output logic ALUOp,
+    output logic [2:0] ALUOp,
     output logic [6:0] OpCode
     // harzard detect signal?
     );
@@ -31,8 +31,8 @@ module decode(
     logic [4:0] rs1_buf;
     logic[4:0] rs2_buf;
     logic [4:0] rd_buf;
-    logic imm_buf;
-    logic ALUOp_buf;
+    logic [31:0] imm_buf;
+    logic [2:0] ALUOp_buf;
     logic [6:0] OpCode_buf;
     
     assign pc_out = pc_buf;
