@@ -44,8 +44,61 @@ module decode(
     assign imm = imm_buf;
     assign ALUOp = ALUOp_buf;
     assign OpCode = OpCode_buf;
-    
-    
+
+    ImmGen immgen_dut (
+        .instruction(instruction),
+        .imm(imm_buf)
+    );
+
+    always_comb begin
+        Opcode_now = instruction[6:0];
+        case (Opcode_now) 
+            // imm_buf is already calculated
+            7'b0010011: begin
+                rs1_buf = instruction[19:15];
+                rs2_buf = 5'b0;
+                rd_buf = instruction[11:7];
+                ALUOp_buf = 3'b000;
+            end
+            7'b0110111: begin
+                rs1_buf = 5'b0;
+                rs2_buf = 5'b0;
+                rd_buf = instruction[11:7];
+                ALUOp_buf = 3'b101;
+            end
+            7'b0110011: begin
+                rs1_buf = instruction[19:15];
+                rs2_buf = instruction[24:20];
+                rd_buf = instruction[11:7];
+                ALUOp_buf = 3'b001;
+            end 
+            7'b0000011: begin
+                rs1_buf = instruction[19:15];
+                rs2_buf = 5'b0;
+                rd_buf = instruction[11:7];
+                ALUOp_buf = 3'b010;
+            end
+            7'b0100011: begin
+                rs1_buf = instruction[19:15];
+                rs2_buf = instruction[24:20];
+                rd_buf = 5'b0;
+                ALUOp_buf = 3'b011;
+            end
+            7'b1100011: begin
+                rs1_buf = instruction[19:15];
+                rs2_buf = instruction[24:20];
+                rd_buf = 5'b0;
+                ALUOp_buf = 3'b100;
+            end
+            7'b1100111: begin
+                rs1_buf = instruction[19:15];
+                rs2_buf = 5'b0;
+                rd_buf = instruction[11:7];
+                ALUOp_buf = 3'b110;
+            end
+        endcase
+    end
+
     always @ (*) begin
         if (reset) begin
             instr_buf <= 32'b0;
