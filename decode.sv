@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-inport types_pkg::*;
+import types_pkg::*;
 module decode(
     input logic clk,
     input logic reset,
@@ -34,7 +34,7 @@ module decode(
     logic fu_alu_next;
     
     // Combinational Section
-    assign ready_in = ready_out && !valid_out_buf;
+    assign ready_in = ready_out && !valid_out;
 
     ImmGen immgen_dut (
         .instr(instr),
