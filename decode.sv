@@ -20,8 +20,8 @@ module decode(
     // Harzard detect signal?
     );
     
-    // track state
-    logic full;
+    // track status
+    logic sent;
 
     //  Future signals
     logic [4:0] rs1_next;
@@ -32,9 +32,10 @@ module decode(
     logic [6:0] opcode_next;
     logic fu_mem_next;
     logic fu_alu_next;
+    logic ready_in_reset;
     
     // Combinational Section
-    assign ready_in = ready_out && !valid_out;
+    assign ready_in = sent||ready_in_reset;
 
     ImmGen immgen_dut (
         .instr(instr),
@@ -47,7 +48,7 @@ module decode(
         .rs2(rs2_next),
         .rd(rd_next),
         .ALUOp(ALUOp_next),
-        .opcode(opcode_next),
+        .Opcode(opcode_next),
         .fu_mem(fu_mem_next),
         .fu_alu(fu_alu_next)
     );
@@ -56,6 +57,7 @@ module decode(
         if (reset) begin
             data_out.pc = 32'b0;
             valid_out = 1'b0;
+            ready_in_reset = 1'b1;
             
             data_out.rs1 = 5'b0;
             data_out.rs2 = 5'b0;
@@ -64,10 +66,11 @@ module decode(
             data_out.ALUOp = 3'b0;
             data_out.Opcode = 7'b0;
             
-            full = 1'b0;
+            sent = 1'b0;
         end else begin
             // Handle upstream
             if (valid_in && ready_in) begin
+                ready_in_reset = 1'b0;
                 data_out.pc = pc_in;
                 valid_out = 1'b1;
                 
@@ -80,17 +83,17 @@ module decode(
                 data_out.ALUOp = ALUOp_next;
                 data_out.fu_mem = fu_mem_next;
                 data_out.fu_alu = fu_alu_next;
-                
-                full = 1'b1;
+
             end else begin
                 // do nothing (keep to avoid bug)
             end
             
             // Handle downstream
-            if (ready_out && valid_out && full) begin
-                full = 1'b0;
-            end else if (!ready_out && valid_out && !full) begin
+            if (ready_out && valid_out) begin
+                sent = 1'b1;
+            end else if (sent && !ready_out) begin // triggered when downstream updated
                 valid_out = 1'b0;
+                sent = 1'b0;
             end else begin
                 // do nothing (keep to avoid bug)
             end

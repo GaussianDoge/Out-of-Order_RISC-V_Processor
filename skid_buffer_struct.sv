@@ -25,7 +25,7 @@ module skid_buffer_struct #(
     assign valid_out = valid_out_sig;
     assign data_out = valid_out_sig ? buffer : data_in;
     
-    always @ (posedge clk) begin
+    always_ff @ (posedge clk) begin
         if (reset) begin
             valid_out_sig <= 1'b0;
             buffer <= 0;
