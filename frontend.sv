@@ -8,15 +8,16 @@ module frontend(
     output decode_data data_out
     );
     
-    logic pc_out;
-    logic pc_4;
-    logic fetch_instr_out;
+    logic [31:0] pc_out;
+    logic [31:0] pc_4;
+    logic [31:0] fetch_instr_out;
     logic fetch_valid_out;
     
     logic decode_ready_in;
     logic decode_valid_out;
-    logic decode_data_out;
+    decode_data decode_data_out;
     logic decode_buffer_ready_in;
+
     
     fetch fetch_unit (
         .clk(clk),
@@ -36,7 +37,7 @@ module frontend(
         .pc_in    (pc_out),
         .valid_in (fetch_valid_out),
         .ready_in (decode_ready_in),
-        .ready_out(ready_out),
+        .ready_out(decode_buffer_ready_in),
         .valid_out(decode_valid_out),
         .data_out (decode_data_out)
     );
@@ -52,7 +53,7 @@ module frontend(
         .data_in    (decode_data_out),
         
         .valid_out  (),
-        .ready_out  (),
+        .ready_out  (1'b1),
         .data_out   (data_out)
     );
     

@@ -37,7 +37,7 @@ module decode(
     // Combinational Section
     assign ready_in = sent||ready_in_reset;
 
-    ImmGen immgen_dut (
+    ImmGen immgen (
         .instr(instr),
         .imm(imm_next)
     );
