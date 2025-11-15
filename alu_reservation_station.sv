@@ -18,8 +18,8 @@ module alu_reservation_station(
     // Downstream
     input logic ready_out,
     output logic valid_out,
-    output alu_rs_data [1:0] data_out,
-    output logic [1:0] valid_issue
+    output logic valid_out2,
+    output alu_rs_data [1:0] data_out
     );
     
     alu_rs_data [7:0] rs_table;
@@ -120,8 +120,8 @@ module alu_reservation_station(
             for (int i = 0; i < 8; i++) begin
                 if (rs_table[i].pr1_ready && rs_table[i].pr2_ready 
                     && rs_table[i].fu && alu2_rdy) begin
+                    valid_out <= 1'b1;
                     data_out[1] <= rs_table[i];
-                    valid_issue[1] <= 1'b1;
                     rs_table[i].valid <= 1'b1;
                     rs_table[i].Opcode <= 7'b0;
                     rs_table[i].prd <= 8'b0;
@@ -140,8 +140,8 @@ module alu_reservation_station(
             for (int i = 0; i < 8; i++) begin
                 if (rs_table[i].pr1_ready && rs_table[i].pr2_ready 
                     && ~rs_table[i].fu && alu1_rdy) begin
+                    valid_out2 <= 1'b1;
                     data_out[0] <= rs_table[i];
-                    valid_issue[0] <= 1'b1;
                     rs_table[i].valid <= 1'b1;
                     rs_table[i].Opcode <= 7'b0;
                     rs_table[i].prd <= 8'b0;
