@@ -42,7 +42,6 @@ package types_pkg;
         logic [7:0] pr2;
         logic pr2_ready;
         logic [31:0] imm;
-        logic [1:0] fu;
         logic [3:0] rob_index;
     }dispatch_pipeline_data;
     
