@@ -1,276 +1,247 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
-// Assuming types_pkg defines:
+import types_pkg::*;
+
+// types_pkg now has:
 // typedef struct packed {
-//   logic [6:0] Opcode;
-//   logic [4:0] rs1;
-//   logic [4:0] rs2;
-//   logic [4:0] rd;
+//   logic [31:0] pc;
+//   logic [4:0]  rs1, rs2, rd;
 //   logic [31:0] imm;
-//   logic [3:0] ALUOp; // Example field
-//   logic fu_alu;
-//   logic fu_mem;
+//   logic [2:0]  ALUOp;
+//   logic [6:0]  Opcode;
+//   logic [1:0]  fu;
 // } decode_data;
 //
 // typedef struct packed {
-//   logic [7:0] ps1;     // 8-bit physical reg tags
-//   logic [7:0] ps2;
-//   logic [7:0] pd_old;
-//   logic [7:0] pd_new;
-//   // ... other data ...
+//   logic [6:0] ps1;
+//   logic [6:0] ps2;
+//   logic [6:0] pd_new;
+//   logic [6:0] pd_old;
+//   logic [32:0] imm;
+//   logic [4:0] rob_tag;
 // } rename_data;
-//
-// If your physical register tags (ps1, pd_new, etc.) are a
-// different width, you'll need to adjust the literal 'd1, 'd2, etc.
-import types_pkg::*;
 
 module rename_tb;
-  // ---- clock & reset ----
+
+  // ---------------- Clock & reset ----------------
   logic clk = 0;
   logic reset = 1;
-  always #5 clk = ~clk;   // 100 MHz
+  always #5 clk = ~clk;  // 100 MHz
 
-  // ---- DUT I/O ----
+  // ---------------- DUT I/O ----------------
   logic        valid_in;
   decode_data  data_in;
   logic        ready_in;
 
-  logic        mispredict = 1'b0;
+  logic        mispredict;
 
   rename_data  data_out;
   logic        valid_out;
   logic        ready_out;
 
-  // ---- MAJOR TESTBENCH ADDITIONS ----
-  // These signals are REQUIRED to test a rename stage.
-  // The DUT *must* have ports for these.
-  // 1. Commit/Retirement Port
-  logic        commit_valid;
-  logic [7:0]  commit_pd_old; // The physical reg to free
-  // 2. Mispredict Flush Port (using mispredict signal)
-  //    (We also need a branch_tag, etc., but mispredict is a start)
-
-
-  // ---- DUT ----
+  // ---------------- Instantiate DUT ----------------
   rename dut (
-    .clk(clk),
-    .reset(reset),
-    .valid_in(valid_in),
-    .data_in(data_in),
-    .ready_in(ready_in),
+    .clk       (clk),
+    .reset     (reset),
+    .valid_in  (valid_in),
+    .data_in   (data_in),
+    .ready_in  (ready_in),
     .mispredict(mispredict),
-    .data_out(data_out),
-    .valid_out(valid_out),
-    .ready_out(ready_out)
-
-    // --- ASSUMED DUT PORTS for a complete test ---
-    // .commit_valid(commit_valid),
-    // .commit_pd_old(commit_pd_old)
+    .data_out  (data_out),
+    .valid_out (valid_out),
+    .ready_out (ready_out)
   );
 
-  // ---- opcodes (RV32I) ----
-  localparam [6:0] OP_IMM = 7'b0010011; // writes rd
-  localparam [6:0] OP     = 7'b0110011; // writes rd
-  localparam [6:0] LOAD   = 7'b0000011; // writes rd
-  localparam [6:0] STORE  = 7'b0100011; // does NOT write rd
+  // ---------------- Opcodes (RV32I) ----------------
+  localparam [6:0] OP_IMM = 7'b0010011; // I-type ALU
+  localparam [6:0] OP     = 7'b0110011; // R-type ALU
+  localparam [6:0] LOAD   = 7'b0000011; // Load
+  localparam [6:0] STORE  = 7'b0100011; // Store (no rd write)
 
-  // ---- helpers ----
-  // Drive one uop and sample outputs one cycle AFTER the transfer ("fire")
+  // ---------------- Helper macro -------------------
+  `define CHECK(MSG, COND) \
+    if (!(COND)) begin \
+      $error("CHECK FAILED: %s (time=%0t)", MSG, $time); \
+    end else begin \
+      $display("CHECK OK   : %s (time=%0t)", MSG, $time); \
+    end
+
+  // ---------------- Drive one uop ------------------
+  // Drives one instruction into rename, waits until it is accepted
+  // (valid_in && ready_in && ready_out), then samples outputs
+  // one cycle later.
   task automatic drive_uop(
     input logic [6:0] opc,
     input logic [4:0] rs1,
     input logic [4:0] rs2,
     input logic [4:0] rd,
     input logic [31:0] imm,
-    input logic hold_ready_one_cycle  // 1 = backpressure this cycle
+    input logic        hold_ready_one_cycle  // 1 = ready_out=0 for one cycle
   );
     begin
-      // present uop
-      valid_in        = 1'b1;
-      data_in         = '0;                 // clear other fields to avoid Xs
-      data_in.Opcode  = opc;
-      data_in.rs1     = rs1;
-      data_in.rs2     = rs2;
-      data_in.rd      = rd;
-      data_in.imm     = imm;
-      data_in.ALUOp   = '0;
-      data_in.fu_alu  = 1'b1;
-      // This logic is better placed in the decoder,
-      // which should pass a `writes_rd` bit to the renamer.
-      // But for a TB, this is acceptable.
-      data_in.fu_mem  = (opc==LOAD || opc==STORE);
+      // Present instruction
+      valid_in      = 1'b1;
+      data_in       = '0;
+      data_in.pc    = 32'h0000_1000; // arbitrary, rename doesn't use pc
+      data_in.Opcode= opc;
+      data_in.rs1   = rs1;
+      data_in.rs2   = rs2;
+      data_in.rd    = rd;
+      data_in.imm   = imm;
 
-      // downstream ready?
+      // Choose ALUOp/fu just to keep decode_data consistent.
+      // (Rename doesn't actually look at fu.)
+      unique case (opc)
+        OP_IMM: begin
+          data_in.ALUOp = 3'b011;
+          data_in.fu    = 2'b01;
+        end
+        OP: begin
+          data_in.ALUOp = 3'b010;
+          data_in.fu    = 2'b01;
+        end
+        LOAD: begin
+          data_in.ALUOp = 3'b000;
+          data_in.fu    = 2'b11;
+        end
+        STORE: begin
+          data_in.ALUOp = 3'b000;
+          data_in.fu    = 2'b11;
+        end
+        default: begin
+          data_in.ALUOp = 3'b000;
+          data_in.fu    = 2'b00;
+        end
+      endcase
+
+      // Downstream ready
       ready_out = ~hold_ready_one_cycle;
 
-      // wait until transfer fires: valid_in && ready_in && ready_out
-      // We must check ready_in here. If the free list is empty,
-      // the DUT *must* assert ready_in=0, and this loop will
-      // (correctly) stall.
-      do @(posedge clk); while (!(valid_in && ready_in && ready_out));
-        
-      // immediately drop valid so the uop can't fire again next cycle
-      valid_in  = 1'b0;
-      ready_out = 1'b1;   // restore downstream ready for next txn
-        
-      // now wait one cycle to observe DUT's registered outputs
-      @(posedge clk);
-        
-      // optional safety: ensure DUT pulsed valid_out on this post-fire cycle
-      // We only expect valid_out if the instruction was accepted (ready_in was high)
-      if (!valid_out) $error("valid_out missing on post-fire cycle (time=%0t)", $time);
+      // Wait for handshake
+      do @(posedge clk);
+      while (!(valid_in && ready_in && ready_out));
 
-      // idle a tick to separate transactions
+      // Drop valid_in so it doesn't re-fire
+      valid_in  = 1'b0;
+      ready_out = 1'b1;
+
+      // One cycle later, outputs should be valid
+      @(posedge clk);
+      if (!valid_out)
+        $error("valid_out missing on post-fire cycle (time=%0t)", $time);
+
+      // Separate transactions a bit
       @(posedge clk);
     end
   endtask
 
-  // quick check macro
-  `define CHECK(msg, cond) \
-    if (!(cond)) begin \
-      $error("CHECK FAILED: %s (time=%0t)", msg, $time); \
-    end else begin \
-      $display("CHECK OK   : %s (time=%0t)", msg, $time); \
-    end
-
-  // ---- test sequence ----
+  // ---------------- Test sequence ------------------
   initial begin
-    // init inputs
-    valid_in  = 0;
-    ready_out = 1;
-    data_in   = '0;
-    commit_valid = 1'b0;
-    commit_pd_old = '0;
+    logic [6:0] pd_new_1;
+    logic [6:0] pd_new_2;
 
-    // reset
-    // Assume reset initializes the map table to an identity map:
-    // map[x1] = p1, map[x2] = p2, etc.
-    // And map[x0] = p0 (the zero register)
-    // And the free list contains {p32, p33, ...}
+    // Init
+    valid_in   = 1'b0;
+    ready_out  = 1'b1;
+    data_in    = '0;
+    mispredict = 1'b0;
+
+    // Reset
     repeat (3) @(posedge clk);
     reset = 1'b0;
     @(posedge clk);
 
-    $display("---- Test 1: Writer, first allocation ----");
-    // 1) ADDI x5, x1, imm  (writer)
-    // We assume an identity map at reset (map[xN] -> pN)
-    // We assume the free list starts at p32 (if 32 arch regs)
-    drive_uop(OP_IMM, /*rs1*/5'd1, /*rs2*/5'd2, /*rd*/5'd5, 32'h0000_0001, /*hold*/0);
-    `CHECK("valid_out pulse observed after fire", valid_out==1'b1);
-    `CHECK("ps1==map[x1]==1",    data_out.ps1==8'd1);
-    `CHECK("ps2==map[x2]==2",    data_out.ps2==8'd2);
-    `CHECK("pd_old==map[x5] (initial) == 5",  data_out.pd_old==8'd5);
+    $display("---- Test 1: First writer (ADDI x5, x1, imm) ----");
+    // Assume at reset: map[xN] = N (identity), free list gives some non-zero tag.
+    drive_uop(OP_IMM, /*rs1*/5'd1, /*rs2*/5'd2, /*rd*/5'd5,
+              32'h0000_0001, /*hold_ready_one_cycle*/ 0);
 
-    // --- FIX 1: THE CONTRADICTION ---
-    // Tests 4 & 5 (correctly) assume pd_new=0 means "no allocation".
-    // Therefore, Test 1 *cannot* expect pd_new=0 for its allocation.
-    // The first free tag *must* be non-zero.
-    // --- REVERTING THE FIX ---
-    // The error logs imply the first allocation *is* 0.
-    // This means "no allocation" (like STORE) is signaled by
-    // pd_old == 0, not pd_new == 0.
-    `CHECK("pd_new==first alloc tag==0",      data_out.pd_new==8'd0);
-    // After this: map[x5] now points to p0. p5 is now "stale"
-    // and will be freed when this instruction commits.
+    `CHECK("valid_out==1 after rename", valid_out == 1'b1);
+    `CHECK("ps1==map[x1]==1",  data_out.ps1 == 7'd1);
+    `CHECK("ps2==map[x2]==2",  data_out.ps2 == 7'd2);
+    `CHECK("pd_old==map[x5]==5", data_out.pd_old == 7'd5);
 
-    $display("---- Test 2: Writer, dependent instruction ----");
-    // 2) LOAD x6, 0(x5) (writer) - ps1 (x5) should see the *new* mapping
-    drive_uop(LOAD, /*rs1*/5'd5, /*rs2*/5'd0, /*rd*/5'd6, 32'h0, /*hold*/0);
-    // map[x5] was updated to p0 in the previous instruction
-    `CHECK("ps1==map[x5]==0 after rename#1",   data_out.ps1==8'd0);
-    `CHECK("pd_old==map[x6] (initial) == 6",   data_out.pd_old==8'd6);
-    // This gets the next free tag
-    `CHECK("pd_new==second alloc tag==1",      data_out.pd_new==8'd1);
-    // After this: map[x6] now points to p1.
+    pd_new_1 = data_out.pd_new;
+    `CHECK("pd_new allocated (!= old mapping)",
+           (pd_new_1 !== data_out.pd_old));
+    // If your free_list never hands out 0, keep this:
+    `CHECK("pd_new != 0 (assuming p0 reserved for x0)",
+           pd_new_1 != 7'd0);
 
-    $display("---- Test 3: Backpressure test ----");
-    // 3) Backpressure test: hold ready_out low one cycle
-    // Issue an ADD (writer) to x7.
-    valid_in        = 1'b1;
-    data_in         = '0;
-    data_in.Opcode  = OP;
-    data_in.rs1     = 5'd6; // should resolve to phys=33 from prior step
-    data_in.rs2     = 5'd0;
-    data_in.rd      = 5'd7;
-    data_in.imm     = '0;
-    data_in.ALUOp   = '0;
-    data_in.fu_alu  = 1'b1;
-    data_in.fu_mem  = 1'b0;
+    $display("---- Test 2: Dependent writer (LOAD x6, 0(x5)) ----");
+    // rs1 = x5 should see the new mapping from Test 1.
+    drive_uop(LOAD, /*rs1*/5'd5, /*rs2*/5'd0, /*rd*/5'd6,
+              32'h0, /*hold_ready_one_cycle*/ 0);
 
-    // Backpressure for one cycle
+    `CHECK("ps1==new x5 mapping (pd_new_1)",
+           data_out.ps1 == pd_new_1);
+    `CHECK("pd_old==map[x6]==6", data_out.pd_old == 7'd6);
+
+    pd_new_2 = data_out.pd_new;
+    `CHECK("second pd_new allocated and different from first",
+           (pd_new_2 != pd_new_1) && (pd_new_2 != 7'd0));
+
+    $display("---- Test 3: Backpressure (stall ready_out) ----");
+    // ADD x7, x6, x0; stall one cycle by holding ready_out low.
+    valid_in       = 1'b1;
+    data_in        = '0;
+    data_in.pc     = 32'h0000_2000;
+    data_in.Opcode = OP;
+    data_in.rs1    = 5'd6;  // should map to pd_new_2
+    data_in.rs2    = 5'd0;
+    data_in.rd     = 5'd7;
+    data_in.imm    = '0;
+    data_in.ALUOp  = 3'b010;
+    data_in.fu     = 2'b01;
+
+    // Backpressure one cycle
     ready_out = 1'b0;
     @(posedge clk);
-    `CHECK("no fire when ready_out=0", !(valid_in && ready_in && ready_out));
-    `CHECK("valid_out is low when stalled", valid_out == 1'b0);
+    `CHECK("no fire when ready_out=0",
+           !(valid_in && ready_in && ready_out));
+    `CHECK("valid_out low while stalled", valid_out == 1'b0);
 
-    // Release backpressure; wait for fire
+    // Release backpressure
     ready_out = 1'b1;
-    do @(posedge clk); while (!(valid_in && ready_in && ready_out));
-    @(posedge clk); // observe outputs (post-fire)
+    // Wait for fire
+    do @(posedge clk);
+    while (!(valid_in && ready_in && ready_out));
 
-    // Now check the values
-    `CHECK("ps1==map[x6]==1",            data_out.ps1==8'd1);
-    `CHECK("pd_old==map[x7]==7",         data_out.pd_old==8'd7);
-    `CHECK("pd_new==third alloc tag==2", data_out.pd_new==8'd2);
+    // One cycle later, sample outputs
+    @(posedge clk);
+    `CHECK("ps1==mapping of x6 (pd_new_2)",
+           data_out.ps1 == pd_new_2);
+    `CHECK("pd_old==map[x7]==7", data_out.pd_old == 7'd7);
+    `CHECK("pd_new allocated for x7",
+           data_out.pd_new != 7'd0);
 
-    // Tidy up this transaction
     valid_in = 1'b0;
     @(posedge clk);
 
-    $display("---- Test 4: Non-writer (STORE) ----");
-    // 4) STORE x2, 0(x1) (non-writer) - must not allocate
-    drive_uop(STORE, /*rs1*/5'd1, /*rs2*/5'd2, /*rd*/5'd0, 32'h0, /*hold*/0);
-    // ps1 and ps2 should be their original identity mappings
-    `CHECK("STORE ps1==map[x1]==1", data_out.ps1==8'd1);
-    `CHECK("STORE ps2==map[x2]==2", data_out.ps2==8'd2);
-    // pd_new=0 is the correct signal for "no allocation"
-    `CHECK("STORE has no pd_new alloc", data_out.pd_new==8'd0);
-    `CHECK("STORE has no pd_old", data_out.pd_old==8'd0);
+    $display("---- Test 4: Non-writer STORE x2 -> 0(x1) ----");
+    // STORE should not allocate a new pd (Opcode == 0100011).
+    drive_uop(STORE, /*rs1*/5'd1, /*rs2*/5'd2, /*rd*/5'd0,
+              32'h0, /*hold_ready_one_cycle*/ 0);
 
-    $display("---- Test 5: Non-writer (x0) ----");
-    // 5) Writer to x0 (should not allocate; x0 immutable)
-    drive_uop(OP_IMM, /*rs1*/5'd1, /*rs2*/5'd0, /*rd*/5'd0, 32'h1234, /*hold*/0);
-    `CHECK("rd==x0 no alloc", data_out.pd_new==8'd0);
-    `CHECK("rd==x0 no pd_old", data_out.pd_old==8'd0);
+    `CHECK("STORE ps1==map[x1]==1", data_out.ps1 == 7'd1);
+    `CHECK("STORE ps2==map[x2]==2", data_out.ps2 == 7'd2);
+    `CHECK("STORE pd_new==0 (no allocation)", data_out.pd_new == 7'd0);
+    `CHECK("STORE pd_old==map[x0]==0",        data_out.pd_old == 7'd0);
 
+    $display("---- Test 5: rd==x0 (should not allocate) ----");
+    // ADDI x0, x1, imm: should NOT allocate, x0 is hardwired.
+    drive_uop(OP_IMM, /*rs1*/5'd1, /*rs2*/5'd0, /*rd*/5'd0,
+              32'h1234, /*hold_ready_one_cycle*/ 0);
 
-    // --- MISSING TEST 1: Free List Empty & Commit ---
-    $display("---- Test 6: (SKIPPED) Free List Empty & Commit ----");
-    // This is the most critical missing test.
-    // 1. You must loop `drive_uop` enough times to exhaust
-    //    the free list (e.g., 32 times if you have 32 free regs).
-    // 2. On the *next* attempt to drive a writer, the
-    //    `do..while` loop in `drive_uop` should stall
-    //    because `ready_in` from the DUT will be LOW.
-    // 3. You should then simulate a "commit" by pulsing
-    //    `commit_valid=1` and providing the `commit_pd_old`
-    //    from the *first* instruction (which was p5).
-    // 4. On the next cycle, `ready_in` should go HIGH,
-    //    and the stalled `drive_uop` should complete.
-    // 5. The `pd_new` for this instruction should be `8'd5`,
-    //    proving that p5 was correctly added back to the
-    //    free list and re-allocated.
+    `CHECK("x0 write: pd_new==0 (no alloc)", data_out.pd_new == 7'd0);
+    `CHECK("x0 write: pd_old==map[x0]==0",    data_out.pd_old == 7'd0);
 
+    $display("---- NOTE: mispredict / checkpoint tests ----");
+    $display("Current rename.sv only has a mispredict input; ");
+    $display("once you add explicit branch-tag & checkpoint ");
+    $display("ports we can extend this TB to exercise recovery.");
 
-    // --- MISSING TEST 2: Mispredict Flush ---
-    $display("---- Test 7: (SKIPPED) Mispredict Flush ----");
-    // This is the second most critical test.
-    // 1. You have already renamed `ADDI x5, ...`
-    //    so that `map[x5]` points to `p32`.
-    // 2. You would now assert `mispredict = 1'b1` for one cycle.
-    //    (This assumes your DUT checkpoints the map table
-    //    on every branch, which is a common design).
-    // 3. After the `mispredict` pulse, the DUT should
-    //    restore its map table to the state *before*
-    //    the `ADDI x5`.
-    // 4. Now, `drive_uop` with an instruction that
-    //    reads x5, e.g., `ADD x9, x5, x0`.
-    // 5. The check `data_out.ps1` should now be `8'd5`
-    //    (the *original* mapping), NOT `8'd32`.
-    //    This proves the flush worked.
-
-
-    $display("All checks completed.");
+    $display("All basic rename tests completed.");
     $finish;
   end
 
