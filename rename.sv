@@ -56,6 +56,11 @@ module rename(
             data_out.pd_new <= '0;
             data_out.ps1 <= '0;
             data_out.ps2 <= '0;
+            data_out.Opcode <= 7'b0;
+            data_out.ALUOp <= 3'b0;
+            data_out.fu_alu <= 1'b0;
+            data_out.fu_br <= 1'b0;
+            data_out.fu_mem <= 1'b0;
             write_en <= 1'b0;
             valid_out <= 1'b0;
             valid_out_delayed <= 1'b0;
@@ -76,6 +81,11 @@ module rename(
                 data_out.ps2 <= map[data_in.rs2];
                 data_out.pd_old <= map[data_in.rd];
                 data_out.imm <= data_in.imm;
+                data_out.Opcode <= data_in.Opcode;
+                data_out.ALUOp <= data_in.ALUOp;
+                data_out.fu_alu <= data_in.fu_alu;
+                data_out.fu_br <= data_in.fu_br;
+                data_out.fu_mem <= data_in.fu_mem;
                 data_out.rob_tag <= ctr;
                 valid_out <= 1'b1;
                 if (write_pd) begin

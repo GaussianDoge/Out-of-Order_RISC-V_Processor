@@ -17,12 +17,16 @@ package types_pkg;
     } decode_data;
     
     typedef struct packed {
-        // ALUOp will be sent directly to dispatch stage
+        logic [31:0] imm;
+        logic [2:0] ALUOp;
+        logic [6:0] Opcode;
+        logic fu_mem;
+        logic fu_alu;
+        logic fu_br;
         logic [6:0] ps1;
         logic [6:0] ps2;
         logic [6:0] pd_new;
         logic [6:0] pd_old;
-        logic [32:0] imm;
         logic [4:0] rob_tag;
     } rename_data;
     
