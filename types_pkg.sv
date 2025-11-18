@@ -13,6 +13,7 @@ package types_pkg;
         logic [6:0] Opcode;
         logic fu_mem;
         logic fu_alu;
+        logic fu_br;
     } decode_data;
     
     typedef struct packed {
