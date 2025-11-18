@@ -8,7 +8,8 @@ module signal_decode(
     output logic [2:0] ALUOp,
     output logic [6:0] Opcode,
     output logic fu_mem,
-    output logic fu_alu
+    output logic fu_alu,
+    output logic fu_br
     );
     
     always_comb begin
@@ -23,6 +24,7 @@ module signal_decode(
                 ALUOp = 3'b011;
                 fu_alu = 1'b1;
                 fu_mem = 1'b0;
+                fu_br = 1'b0;
             end
             // LUI
             7'b0110111: begin
@@ -32,6 +34,7 @@ module signal_decode(
                 ALUOp = 3'b100;
                 fu_alu = 1'b1;
                 fu_mem = 1'b0;
+                fu_br = 1'b0;
             end
             // R-type instructions
             7'b0110011: begin
@@ -41,6 +44,7 @@ module signal_decode(
                 ALUOp = 3'b010;
                 fu_alu = 1'b1;
                 fu_mem = 1'b0;
+                fu_br = 1'b0;
             end
             // Load instructions excluding LUI 
             7'b0000011: begin
@@ -50,6 +54,7 @@ module signal_decode(
                 ALUOp = 3'b000;
                 fu_alu = 1'b1;
                 fu_mem = 1'b1;
+                fu_br = 1'b0;
             end
             // S-type instructions
             7'b0100011: begin
@@ -59,6 +64,7 @@ module signal_decode(
                 ALUOp = 3'b000;
                 fu_alu = 1'b1;
                 fu_mem = 1'b1;
+                fu_br = 1'b0;
             end
             // BNE
             7'b1100011: begin
@@ -68,6 +74,7 @@ module signal_decode(
                 ALUOp = 3'b001;
                 fu_alu = 1'b1;
                 fu_mem = 1'b0;
+                fu_br = 1'b1;
             end
             // JALR
             7'b1100111: begin
@@ -77,6 +84,7 @@ module signal_decode(
                 ALUOp = 3'b110;
                 fu_alu = 1'b1;
                 fu_mem = 1'b0;
+                fu_br = 1'b0;
             end
             // For other unknown OPcodes
             default: begin
@@ -86,6 +94,7 @@ module signal_decode(
                 ALUOp = 3'b0;
                 fu_alu = 1'b0;
                 fu_mem = 1'b0;
+                fu_br = 1'b0;
             end
         endcase
     end
