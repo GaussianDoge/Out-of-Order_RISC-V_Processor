@@ -17,7 +17,7 @@ module rs_tb;
 
     // Downstream issue
     logic                 valid_out;
-    rs_data [1:0]         data_out;
+    rs_data               data_out;
 
     // New dest physical reg marked not ready
     logic [6:0]           nr_reg;
@@ -170,12 +170,12 @@ module rs_tb;
             end else begin
                 $display("[%0t] ISSUE (%s): prd=%0d pr1=%0d rdy1=%0b pr2=%0d rdy2=%0b fu=%0b rob=%0d age=%0d",
                     $time, tag,
-                    data_out[1].prd,
-                    data_out[1].pr1, data_out[1].pr1_ready,
-                    data_out[1].pr2, data_out[1].pr2_ready,
-                    data_out[1].fu,
-                    data_out[1].rob_index,
-                    data_out[1].age);
+                    data_out.prd,
+                    data_out.pr1, data_out.pr1_ready,
+                    data_out.pr2, data_out.pr2_ready,
+                    data_out.fu,
+                    data_out.rob_index,
+                    data_out.age);
                 @(posedge clk);
             end
         end

@@ -13,7 +13,7 @@ module rs(
     
     // Downstream
     output logic valid_out,
-    output rs_data [1:0] data_out,
+    output rs_data data_out,
     
     // Set destination physical reg to not ready
     output logic [6:0] nr_reg,
@@ -134,7 +134,7 @@ module rs(
                 if (rs_table[i].pr1_ready && rs_table[i].pr2_ready 
                     && fu_rdy) begin
                     valid_out <= 1'b1;
-                    data_out[1] <= rs_table[i];
+                    data_out <= rs_table[i];
                     rs_table[i].valid <= 1'b1;
                     rs_table[i].Opcode <= 7'b0;
                     rs_table[i].prd <= 7'b0;
