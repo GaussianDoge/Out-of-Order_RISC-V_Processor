@@ -75,7 +75,7 @@ module decode(
             data_out.fu_alu = 1'b0;
             data_out.fu_br = 1'b0;
             data_out.func3 = 3'b0;
-            data_out.func7 = 7'b0
+            data_out.func7 = 7'b0;
             
             sent = 1'b0;
         end else begin

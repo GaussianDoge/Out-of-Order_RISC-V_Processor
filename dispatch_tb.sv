@@ -142,7 +142,7 @@ module dispatch_tb;
             data_in.fu_alu = 1;
             data_in.fu_mem = 0;
             data_in.fu_br  = 0;
-            data_in.OpCode = 7'b0110011; // R-Type ADD
+            data_in.Opcode = 7'b0110011; // R-Type ADD
             data_in.rob_tag = tag;
             data_in.pd_new = pd;
             data_in.ps1 = p1;
@@ -163,7 +163,7 @@ module dispatch_tb;
             data_in.fu_alu = 0;
             data_in.fu_mem = 1; // LSU
             data_in.fu_br  = 0;
-            data_in.OpCode = 7'b0000011; // Load
+            data_in.Opcode = 7'b0000011; // Load
             data_in.rob_tag = tag;
             data_in.pd_new = pd;
             data_in.ps1 = p1;

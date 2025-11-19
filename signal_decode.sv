@@ -9,7 +9,9 @@ module signal_decode(
     output logic [6:0] Opcode,
     output logic fu_mem,
     output logic fu_alu,
-    output logic fu_br
+    output logic fu_br,
+    output logic func3,
+    output logic func7
     );
     
     always_comb begin
