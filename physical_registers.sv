@@ -4,14 +4,31 @@ module physical_registers(
     input logic clk,
     input logic reset,
 
-    // Write and read
-    input logic read,
-    input logic write,
-    input logic [31:0] write_data,
-    input logic [6:0] target_reg,
-    output logic [31:0] read_data,
+    // Write and read (three ports for 3 FUs)
+    input logic read1,
+    input logic write1,
+    input logic [31:0] write_data1,
+    input logic [6:0] target_reg1,
+    output logic [31:0] read_data1,
     output logic [6:0] rdy_reg1,
     output logic reg1_rdy_valid,
+    
+    input logic read2,
+    input logic write2,
+    input logic [31:0] write_data2,
+    input logic [6:0] target_reg2,
+    output logic [31:0] read_data2,
+    output logic [6:0] rdy_reg2,
+    output logic reg2_rdy_valid,
+    
+    input logic read3,
+    input logic write3,
+    input logic [31:0] write_data3,
+    input logic [6:0] target_reg3,
+    output logic [31:0] read_data3,
+    output logic [6:0] rdy_reg3,
+    output logic reg3_rdy_valid,
+    
     
     // check if reg is ready
     input logic alu_rs_check_rdy1,
@@ -98,16 +115,54 @@ module physical_registers(
                 reg_rdy_table[i] <= 1'b1;
             end
         end else begin
-            reg1_rdy_valid <= 1'b0;
-            case ({read, write})
+            // Writeback for FU1
+            case ({read1, write1})
                 2'b10: begin // read only
-                    read_data <= phy_reg[target_reg];
+                    read_data1 <= phy_reg[target_reg1];
+                    reg1_rdy_valid <= 1'b0;
                 end
                 2'b01: begin // write only => automatically set reg to ready
-                    phy_reg[target_reg] <= write_data;
-                    reg_rdy_table[target_reg] <= 1'b1;
-                    rdy_reg1 <= target_reg;
+                    phy_reg[target_reg1] <= write_data1;
+                    reg_rdy_table[target_reg1] <= 1'b1;
+                    rdy_reg1 <= target_reg1;
                     reg1_rdy_valid <= 1'b1;
+                end
+                default: begin
+                    reg1_rdy_valid <= 1'b0;
+                end
+            endcase
+            
+            // Writeback for FU2
+            case ({read2, write2})
+                2'b10: begin // read only
+                    read_data2 <= phy_reg[target_reg2];
+                    reg2_rdy_valid <= 1'b0;
+                end
+                2'b01: begin // write only => automatically set reg to ready
+                    phy_reg[target_reg2] <= write_data2;
+                    reg_rdy_table[target_reg2] <= 1'b1;
+                    rdy_reg2 <= target_reg2;
+                    reg2_rdy_valid <= 1'b1;
+                end
+                default: begin
+                    reg2_rdy_valid <= 1'b0;
+                end
+            endcase
+            
+            // Writeback for FU3
+            case ({read3, write3})
+                2'b10: begin // read only
+                    read_data3 <= phy_reg[target_reg3];
+                    reg3_rdy_valid <= 1'b0;
+                end
+                2'b01: begin // write only => automatically set reg to ready
+                    phy_reg[target_reg3] <= write_data3;
+                    reg_rdy_table[target_reg3] <= 1'b1;
+                    rdy_reg3 <= target_reg3;
+                    reg3_rdy_valid <= 1'b1;
+                end
+                default: begin
+                    reg3_rdy_valid <= 1'b0;
                 end
             endcase
         end
