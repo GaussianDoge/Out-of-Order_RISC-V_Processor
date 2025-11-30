@@ -81,7 +81,7 @@ module processor(
                            // LSU
                            .lsu_rs_valid_out(mem_issued),
                            .lsu_rs_data_out(lsu_rs_data_out),
-                           .lsu_rs_ready_in(lsu_rdy)
+                           .lsu_rs_ready_in(lsu_rdy),
                            
                            // Interface with PRF
                            .alu_nr_reg(alu_nr_reg),
@@ -99,7 +99,13 @@ module processor(
                            .preg3_valid(reg3_rdy_valid),
 
                            // Interface with ROB
+                           .complete_in(),
+                           .rob_fu_tag(),
+                           .mispredict(mispredict),
+                           .mispredict_tag(),
 
+                           .rob_retire_tag(),
+                           .rob_retire_valid()
                            );
     // Load From Reg
     // Wires between PRF and load_reg
