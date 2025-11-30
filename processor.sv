@@ -221,7 +221,15 @@ module processor(
                            .branch_rd()
                            );
     
-    // FUs (We need readiness signals for each FUs, Refer to var declaration in Dispatch)
+    // FUs
+    alu_data alu_data_out;
+    b_data b_data_out;
+    mem_data mem_data_out;
+    
+    assign alu_rdy = alu_data_out.fu_alu_ready;
+    assign br_rdy = b_data_out.fu_b_ready;
+    assign lsu_rdy = mem_data_out.fu_mem_ready;
+    
     fus fu(.clk(clk),
            .reset(reset),
 
@@ -251,9 +259,9 @@ module processor(
            .br_mispredict_tag(),
 
            // Output data
-           .alu_out(),
-           .b_out(),
-           .mem_out()
+           .alu_out(alu_data_out),
+           .b_out(b_data_out),
+           .mem_out(mem_data_out)
            );
     
 endmodule
