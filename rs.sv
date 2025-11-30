@@ -53,24 +53,24 @@ module rs(
         
             // Update ready status of reg; Assuming at most retire 3 instr
             for (int i = 0; i < 8; i++) begin
-                if (rs_table[i].pr1 == reg1_rdy && reg1_rdy_valid) begin
-                    rs_table[i].pr1_ready = 1'b1;
-                end else if (rs_table[i].pr2 == reg1_rdy && reg1_rdy_valid) begin
-                    rs_table[i].pr2_ready <= 1'b1;
+                if (rs_table[i].ps1 == reg1_rdy && reg1_rdy_valid) begin
+                    rs_table[i].ps1_ready = 1'b1;
+                end else if (rs_table[i].ps2 == reg1_rdy && reg1_rdy_valid) begin
+                    rs_table[i].ps2_ready <= 1'b1;
                 end else begin
                 end
                 
-                if (rs_table[i].pr1 == reg2_rdy && reg2_rdy_valid) begin
-                    rs_table[i].pr1_ready = 1'b1;
-                end else if (rs_table[i].pr2 == reg2_rdy && reg2_rdy_valid) begin
-                    rs_table[i].pr2_ready = 1'b1;
+                if (rs_table[i].ps1 == reg2_rdy && reg2_rdy_valid) begin
+                    rs_table[i].ps1_ready = 1'b1;
+                end else if (rs_table[i].ps2 == reg2_rdy && reg2_rdy_valid) begin
+                    rs_table[i].ps2_ready = 1'b1;
                 end else begin
                 end
                 
-                if (rs_table[i].pr1 == reg3_rdy && reg3_rdy_valid) begin
-                    rs_table[i].pr1_ready = 1'b1;
-                end else if (rs_table[i].pr2 == reg3_rdy && reg3_rdy_valid) begin
-                    rs_table[i].pr2_ready = 1'b1;
+                if (rs_table[i].ps1 == reg3_rdy && reg3_rdy_valid) begin
+                    rs_table[i].ps1_ready = 1'b1;
+                end else if (rs_table[i].ps2 == reg3_rdy && reg3_rdy_valid) begin
+                    rs_table[i].ps2_ready = 1'b1;
                 end else begin
                 end
             end
@@ -84,11 +84,11 @@ module rs(
             for (int i = 0; i < 8; i++) begin
                 rs_table[i].valid <= 1'b1;
                 rs_table[i].Opcode <= 7'b0;
-                rs_table[i].prd <= 7'b0;
-                rs_table[i].pr1 <= 7'b0;
-                rs_table[i].pr1_ready <= 1'b0;
-                rs_table[i].pr2 <= 7'b0;
-                rs_table[i].pr2_ready <= 1'b0;
+                rs_table[i].pd <= 7'b0;
+                rs_table[i].ps1 <= 7'b0;
+                rs_table[i].ps1_ready <= 1'b0;
+                rs_table[i].ps2 <= 7'b0;
+                rs_table[i].ps2_ready <= 1'b0;
                 rs_table[i].imm <= 32'b0;
                 rs_table[i].fu <= 2'b0;
                 rs_table[i].rob_index <= 4'b0;
