@@ -163,7 +163,7 @@ module physical_registers(
             end
         end else begin
             // Write for ALU
-            if (write_alu_rd) begin
+            if (write_alu_rd && target_alu_reg != 0) begin
                 // write only => automatically set reg to ready
                 phy_reg[target_alu_reg] <= write_alu_data;
                 reg_rdy_table[target_alu_reg] <= 1'b1;
@@ -174,7 +174,7 @@ module physical_registers(
             end
             
             // Write for Branch Unit
-            if (write_b_rd) begin
+            if (write_b_rd && target_b_reg != 0) begin
                 // write only => automatically set reg to ready
                 phy_reg[target_b_reg] <= write_b_data;
                 reg_rdy_table[target_b_reg] <= 1'b1;
@@ -185,7 +185,7 @@ module physical_registers(
             end
             
             // Write for LRU
-            if (write_lru_rd) begin
+            if (write_lru_rd && target_lru_reg != 0) begin
                 // write only => automatically set reg to ready
                 phy_reg[target_lru_reg] <= write_lru_data;
                 reg_rdy_table[target_lru_reg] <= 1'b1;
