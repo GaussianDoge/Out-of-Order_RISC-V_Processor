@@ -8,6 +8,7 @@ module processor(
     // General data for all stages
     logic [31:0] pc;
     logic mispredict;
+    logic [4:0]  mispredict_tag; // Added missing declaration
     
     // Fetch and Decode Stages (Frontend)
     logic rename_ready_in;
@@ -36,7 +37,9 @@ module processor(
                        .mispredict(mispredict),
                        .data_out(rename_data_out),
                        .valid_out(rename_valid_out),
-                       .ready_out(dispatch_ready_in));
+                       .ready_out(dispatch_ready_in),
+                       .write_en(rob_retire_valid),
+                       .rob_data_in(retire_pd_old));
     
     // Dispatch Stage
     // Problematic:
@@ -45,20 +48,34 @@ module processor(
     logic alu_issued;
     rs_data alu_rs_data_out;
     logic alu_rdy;
-    logic [6:0] alu_nr_reg;
-    logic alu_nr_valid;
 
     logic b_issued;
     rs_data br_rs_data_out;
     logic br_rdy;
-    logic [6:0] branch_nr_reg;
-    logic branch_nr_valid;
+ 
 
     logic mem_issued;
     rs_data lsu_rs_data_out;
     logic lsu_rdy;
+
+    // Wires for the readiness check
+    logic [6:0] dispatch_query_ps1;
+    logic [6:0] dispatch_query_ps2;
+    logic prf_response_rdy1;
+    logic prf_response_rdy2;
+
+    // Wires for Setting Registers to "Busy" (Not Ready)
+    logic [6:0] alu_nr_reg;
+    logic       alu_nr_valid;
+    logic [6:0] br_nr_reg;
+    logic       br_nr_valid;
     logic [6:0] lsu_nr_reg;
-    logic lsu_nr_valid;
+    logic       lsu_nr_valid;
+
+    // Commit Signals
+    logic [4:0] rob_retire_tag;
+    logic rob_retire_valid;
+    logic [6:0] retire_pd_old;
     
     // From PRF to RS (Set readiness)
     logic [6:0] rdy_reg1;
@@ -67,6 +84,10 @@ module processor(
     logic reg2_rdy_valid;
     logic [6:0] rdy_reg3;
     logic reg3_rdy_valid;
+
+    alu_data alu_data_out;
+    b_data b_data_out;
+    mem_data mem_data_out;
     
     dispatch dispatch_unit(.clk(clk),
                            .reset(reset),
@@ -93,28 +114,38 @@ module processor(
                            .lsu_rs_ready_in(lsu_rdy),
                            
                            // Interface with PRF
-                           .alu_nr_reg(alu_nr_reg),
-                           .alu_nr_valid(alu_nr_valid),
-                           .br_nr_reg(branch_nr_reg),
-                           .br_nr_valid(branch_nr_valid),
-                           .lsu_nr_reg(lsu_nr_reg),
-                           .lsu_nr_valid(lsu_nr_valid),
+                           .query_ps1(dispatch_query_ps1),
+                           .query_ps2(dispatch_query_ps2),
+                           .pr1_is_ready(prf_response_rdy1),
+                           .pr2_is_ready(prf_response_rdy2),
+                           .alu_nr_reg_out(alu_nr_reg),
+                           .alu_nr_valid_out(alu_nr_valid),
+                           .br_nr_reg_out(br_nr_reg),
+                           .br_nr_valid_out(br_nr_valid),
+                           .lsu_nr_reg_out(lsu_nr_reg),
+                           .lsu_nr_valid_out(lsu_nr_valid),
 
-                           .preg1_rdy(rdy_reg1),
-                           .preg2_rdy(rdy_reg2),
-                           .preg3_rdy(rdy_reg3),
-                           .preg1_valid(reg1_rdy_valid),
-                           .preg2_valid(reg2_rdy_valid),
-                           .preg3_valid(reg3_rdy_valid),
+                           // CDB Inputs (For "Lost Wakeup" Check)
+                           .preg1_rdy(alu_data_out.p_alu),
+                           .preg1_valid(alu_data_out.fu_alu_done),
+                           .preg2_rdy(b_data_out.p_b),
+                           .preg2_valid(b_data_out.fu_b_done),
+                           .preg3_rdy(mem_data_out.p_mem),
+                           .preg3_valid(mem_data_out.fu_mem_done),
 
-                           // Interface with ROB
-                           .complete_in(),
-                           .rob_fu_tag(),
+                           // ROB Interface
+                           .complete_in(alu_data_out.fu_alu_done || b_data_out.fu_b_done || mem_data_out.fu_mem_done),
+                           
+                           // Mux the correct ROB Tag to the ROB
+                           .rob_fu_tag(alu_data_out.fu_alu_done ? alu_data_out.rob_fu_alu : 
+                                      (b_data_out.fu_b_done    ? b_data_out.rob_fu_b : mem_data_out.rob_fu_mem)),
+                           
                            .mispredict(mispredict),
-                           .mispredict_tag(),
-
-                           .rob_retire_tag(),
-                           .rob_retire_valid()
+                           .mispredict_tag(mispredict_tag),
+                           
+                           .rob_retire_tag(rob_retire_tag),
+                           .rob_retire_valid(rob_retire_valid),
+                           .retire_pd_old(retire_pd_old)
                            );
     // Load From Reg
     // Wires between PRF and load_reg
@@ -185,6 +216,22 @@ module processor(
     logic [31:0] write_lru_data;
     logic [6:0] target_lru_reg;
     
+    assign write_alu_rd = alu_data_out.fu_alu_done;
+    assign write_alu_data = alu_data_out.data;
+    assign target_alu_reg = alu_data_out.p_alu;
+
+    assign write_b_rd = b_data_out.fu_b_done;
+    assign write_b_data = b_data_out.data;
+    assign target_b_reg = b_data_out.p_b;
+
+    assign write_lru_rd = mem_data_out.fu_mem_done;
+    assign write_lru_data = mem_data_out.data;
+    assign target_lru_reg = mem_data_out.p_mem;
+
+    assign alu_rdy = alu_data_out.fu_alu_ready;
+    assign br_rdy = b_data_out.fu_b_ready;
+    assign lsu_rdy = mem_data_out.fu_mem_ready;
+    
     physical_registers PRF(.clk(clk),
                            .reset(reset),
                            
@@ -231,48 +278,31 @@ module processor(
                            .reg3_rdy_valid(reg3_rdy_valid),
 
                            // Check if reg is ready
-                           .alu_rs_check_rdy1(),
-                           .alu_rs_check_rdy2(),
-                           .alu_pr1(),
-                           .alu_pr2(),
+                           .alu_rs_check_rdy1(prf_response_rdy1),
+                           .alu_rs_check_rdy2(prf_response_rdy2),
+                           .alu_pr1(dispatch_query_ps1),
+                           .alu_pr2(dispatch_query_ps2),
 
-                           .lsu_rs_check_rdy1(),
-                           .lsu_rs_check_rdy2(),
-                           .lsu_pr1(),
-                           .lsu_pr2(),
+                           .lsu_rs_check_rdy1(prf_response_rdy1),
+                           .lsu_rs_check_rdy2(prf_response_rdy2),
+                           .lsu_pr1(dispatch_query_ps1),
+                           .lsu_pr2(dispatch_query_ps2),
 
-                           .branch_rs_check_rdy1(),
-                           .branch_rs_check_rdy2(),
-                           .branch_pr1(),
-                           .branch_pr2(),
+                           .branch_rs_check_rdy1(prf_response_rdy1),
+                           .branch_rs_check_rdy2(prf_response_rdy2),
+                           .branch_pr1(dispatch_query_ps1),
+                           .branch_pr2(dispatch_query_ps2),
                            
                            // Set rd to not ready after dispatch
                            .alu_set_not_rdy(alu_nr_valid),
                            .lsu_set_not_rdy(lsu_nr_valid),
-                           .branch_set_not_rdy(branch_nr_valid),
+                           .branch_set_not_rdy(br_nr_valid),
                            .alu_rd(alu_nr_reg),
                            .lsu_rd(lsu_nr_reg),
-                           .branch_rd(branch_nr_reg)
+                           .branch_rd(br_nr_reg)
                            );
     
     // FUs
-    alu_data alu_data_out;
-    b_data b_data_out;
-    mem_data mem_data_out;
-    
-    assign write_alu_rd = alu_data_out.fu_alu_done;
-    assign write_alu_data = alu_data_out.data;
-    assign target_alu_reg = alu_data_out.p_alu;
-    assign write_b_rd = b_data_out.fu_b_done;
-    assign write_b_data = b_data_out.data;
-    assign target_b_reg = b_data_out.p_b;
-    assign write_lru_rd = mem_data_out.fu_mem_done;
-    assign write_lru_data = mem_data_out.data;
-    assign target_lru_reg = mem_data_out.p_mem;
-    assign alu_rdy = alu_data_out.fu_alu_ready;
-    assign br_rdy = b_data_out.fu_b_ready;
-    assign lsu_rdy = mem_data_out.fu_mem_ready;
-    
     fus fu(.clk(clk),
            .reset(reset),
 
@@ -285,9 +315,9 @@ module processor(
            .mem_rs_data(lsu_rs_data_out),
 
            // From ROB
-           .curr_rob_tag(),
+           .curr_rob_tag(rob_retire_tag),
            .mispredict(mispredict),
-           .mispredict_tag(),
+           .mispredict_tag(mispredict_tag),
 
            // PRF
            .ps1_alu_data(ps1_alu_data),
@@ -299,7 +329,7 @@ module processor(
 
            // From FU branch
            .br_mispredict(mispredict),
-           .br_mispredict_tag(),
+           .br_mispredict_tag(mispredict_tag),
 
            // Output data
            .alu_out(alu_data_out),

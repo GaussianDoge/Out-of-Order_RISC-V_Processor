@@ -28,12 +28,19 @@ module dispatch(
     input  logic lsu_rs_ready_in,
 
     // Interface with PRF
-    output logic [6:0] alu_nr_reg,
-    output logic alu_nr_valid,
-    output logic [6:0] br_nr_reg,
-    output logic br_nr_valid,
-    output logic [6:0] lsu_nr_reg,
-    output logic lsu_nr_valid,
+    output logic [6:0] alu_nr_reg_out,
+    output logic alu_nr_valid_out,
+    
+    output logic [6:0] br_nr_reg_out,
+    output logic br_nr_valid_out,
+    
+    output logic [6:0] lsu_nr_reg_out,
+    output logic lsu_nr_valid_out,
+
+    output logic [6:0] query_ps1, // Query PRF: "Is source 1 ready?"
+    output logic [6:0] query_ps2, // Query PRF: "Is source 2 ready?"
+    input  logic pr1_is_ready, // PRF Answer: "Yes/No"
+    input  logic pr2_is_ready, // PRF Answer: "Yes/No"
 
     input logic [6:0] preg1_rdy,
     input logic [6:0] preg2_rdy,
@@ -49,7 +56,8 @@ module dispatch(
     input logic [4:0] mispredict_tag, // why 5 bits
     
     output logic [4:0] rob_retire_tag, // why 5 bits
-    output logic rob_retire_valid
+    output logic rob_retire_valid,
+    output logic [6:0] retire_pd_old
 );
 
     // Routing Logic
@@ -146,6 +154,9 @@ module dispatch(
     logic rob_we;
     assign rob_we = alu_rs_write_en || br_rs_write_en || lsu_rs_write_en;
 
+    // Internal wire to capture the assigned ROB ID
+    logic [4:0] rob_allocated_ptr; 
+
     // ROB
     rob u_rob (
         .clk            (clk),
@@ -161,12 +172,19 @@ module dispatch(
         .mispredict_tag (mispredict_tag), // 5 bits?
         .rob_tag_out    (rob_retire_tag), // 5 bits?
         .valid_retired  (rob_retire_valid),
+        .pd_old_out     (retire_pd_old),
         .complete_out   (), 
         .full           (rob_is_full),
-        .empty          ()
+        .empty          (),
+        .ptr            (rob_allocated_ptr)
     );
 
+    // Query the PRF 
+    assign query_ps1 = active_packet.ps1;
+    assign query_ps2 = active_packet.ps2;
+    
     dispatch_pipeline_data dispatch_packet;
+    logic match_cdb_1, match_cdb_2;
     always_comb begin
         dispatch_packet.Opcode    = active_packet.Opcode;
         dispatch_packet.pc        = active_packet.pc;
@@ -174,15 +192,27 @@ module dispatch(
         dispatch_packet.pr1       = active_packet.ps1;
         dispatch_packet.pr2       = active_packet.ps2;
         dispatch_packet.imm       = active_packet.imm[31:0];
-        dispatch_packet.rob_index = active_packet.rob_tag[3:0];
+        dispatch_packet.rob_index = rob_allocated_ptr;
 
         dispatch_packet.func3     = active_packet.func3;
         dispatch_packet.func7     = active_packet.func7;
         
         dispatch_packet.pr1_ready = 1'b0; 
         dispatch_packet.pr2_ready = 1'b0;
+
+        // Check if the source matches any tag currently on the CDB (forwarding)
+        match_cdb_1 = (preg1_valid && preg1_rdy == active_packet.ps1) || 
+                      (preg2_valid && preg2_rdy == active_packet.ps1) || 
+                      (preg3_valid && preg3_rdy == active_packet.ps1);
+
+        match_cdb_2 = (preg1_valid && preg1_rdy == active_packet.ps2) || 
+                      (preg2_valid && preg2_rdy == active_packet.ps2) || 
+                      (preg3_valid && preg3_rdy == active_packet.ps2);
+
+        // Determine Final Readiness
+        dispatch_packet.pr1_ready = (active_packet.ps1 == 0) || pr1_is_ready || match_cdb_1; 
+        dispatch_packet.pr2_ready = (active_packet.ps2 == 0) || pr2_is_ready || match_cdb_2;
     end
-    
 
     // ALU RS
     rs u_alu_rs (
@@ -195,8 +225,8 @@ module dispatch(
         .ready_in(alu_rs_has_space), 
         .instr(dispatch_packet),
         
-        .nr_reg(alu_nr_reg),
-        .nr_valid(alu_nr_valid),
+        .nr_reg(alu_nr_reg_out),
+        .nr_valid(alu_nr_valid_out),
         
         .reg1_rdy(preg1_rdy),
         .reg2_rdy(preg2_rdy),
@@ -220,8 +250,8 @@ module dispatch(
         .ready_in(br_rs_has_space), 
         .instr(dispatch_packet),
         
-        .nr_reg(br_nr_reg),
-        .nr_valid(br_nr_valid),
+        .nr_reg(br_nr_reg_out),
+        .nr_valid(br_nr_valid_out),
         
         .reg1_rdy(preg1_rdy),
         .reg2_rdy(preg2_rdy),
@@ -245,8 +275,8 @@ module dispatch(
         .ready_in(lsu_rs_has_space), 
         .instr(dispatch_packet),
         
-        .nr_reg(lsu_nr_reg),
-        .nr_valid(lsu_nr_valid),
+        .nr_reg(lsu_nr_reg_out),
+        .nr_valid(lsu_nr_valid_out),
         
         .reg1_rdy(preg1_rdy),
         .reg2_rdy(preg2_rdy),
@@ -258,5 +288,4 @@ module dispatch(
         
         .flush(mispredict)
     );
-
 endmodule
