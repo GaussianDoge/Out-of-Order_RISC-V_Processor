@@ -20,6 +20,7 @@ module rob (
     // Update RS
     output logic [4:0] rob_tag_out,
     output logic valid_retired,
+    output logic [6:0] pd_old_out,
     // Update FU availability
     output logic complete_out,
 
@@ -78,6 +79,7 @@ module rob (
                 if (do_retire) begin
                     rob_tag_out <= r_ptr;
                     valid_retired <= 1'b1;
+                    pd_old_out <= rob_table[r_ptr].pd_old; 
                     rob_table[r_ptr] <= '0;
                     r_ptr <= (r_ptr == 5'd15) ? 5'b0 : r_ptr + 1;
                 end
