@@ -11,24 +11,31 @@ module rob (
     input logic [31:0] pc_in,
     
     // from FU stage 
-    input logic complete_in,
-    input logic [4:0] rob_fu,
-    input logic mispredict,
-    input logic branch,
-    input logic [4:0] mispredict_tag,
+    input logic fu_alu_done,
+    input logic fu_b_done,
+    input logic fu_mem_done,
+    input logic [4:0] rob_fu_alu,
+    input logic [4:0] rob_fu_b,
+    input logic [4:0] rob_fu_mem,
+    input logic br_mispredict,
+    input logic [4:0] br_mispredict_tag,
     
-    // Update RS
-    output logic [4:0] rob_tag_out,
+    // Update free_list
+    output logic [6:0] preg_old,
     output logic valid_retired,
-    output logic [6:0] pd_old_out,
-    // Update FU availability
-    output logic complete_out,
 
-    output logic full,
-    output logic empty,
-    // For RS to keep track of the rob index
-    output logic [4:0] ptr
+    // Global mispredict 
+    output logic mispredict,
+    output logic [4:0] mispredict_tag,
+    output logic [4:0] ptr,
+
+    output logic full
+//    output logic [4:0] retired_ptr
 );
+//    assign retired_ptr = r_ptr; 
+
+    assign mispredict = br_mispredict;
+    assign mispredict_tag = br_mispredict_tag;
     rob_data rob_table[0:15];
     
     logic [4:0]  w_ptr, r_ptr;      
@@ -37,14 +44,12 @@ module rob (
     logic [4:0]  ctr;            
     
     assign full = (ctr == 16); 
-    assign empty = (ctr == 0);
     
     logic do_write;           
     logic do_retire;
     
-    assign do_retire = rob_table[r_ptr].complete && rob_table[r_ptr].valid;
+    assign do_retire = (ctr!=0) && rob_table[r_ptr].complete && rob_table[r_ptr].valid;
     assign do_write = write_en && !full;
-    assign complete_out = rob_table[r_ptr].complete;
 
     always_ff @(posedge clk) begin
         if (reset) begin
@@ -52,18 +57,24 @@ module rob (
             r_ptr    <= '0;
             ctr      <= '0;
             for (int i = 0; i < 16; i++) begin
-                rob_table[i] = '0;
+                rob_table[i] <= '0;
             end
         end else begin
             valid_retired <= 1'b0;
             // Update the complete column for a specific instruction
-            if (complete_in && rob_table[rob_fu].valid) begin
-                rob_table[rob_fu].complete <= 1'b1;
+            if (fu_alu_done && rob_table[rob_fu_alu].valid) begin
+                rob_table[rob_fu_alu].complete <= 1'b1;
+            end
+            if (fu_b_done && rob_table[rob_fu_b].valid) begin
+                rob_table[rob_fu_b].complete <= 1'b1;
+            end
+            if (fu_mem_done && rob_table[rob_fu_mem].valid) begin
+                rob_table[rob_fu_mem].complete <= 1'b1;
             end
             // Mispredict operation
-            if (mispredict) begin
+            if (br_mispredict) begin
                 automatic logic [4:0] old_w = w_ptr;            
-                automatic logic [4:0] re_ptr = (mispredict_tag==15)?0:mispredict_tag+1;  
+                automatic logic [4:0] re_ptr = (br_mispredict_tag==15)?0:br_mispredict_tag+1;  
                 automatic logic [4:0] newcnt = (re_ptr >= r_ptr) ? (re_ptr - r_ptr) : (5'd16 - r_ptr + re_ptr);
         
                 for (logic [4:0] i=re_ptr; i!=old_w; i=(i==15)?0:i+1) begin
@@ -77,9 +88,8 @@ module rob (
                 // inform reservation station an instruction is retired, 
                 // also reset that row in the table, advance r_ptr by 1
                 if (do_retire) begin
-                    rob_tag_out <= r_ptr;
+                    preg_old <= rob_table[r_ptr].pd_old;
                     valid_retired <= 1'b1;
-                    pd_old_out <= rob_table[r_ptr].pd_old; 
                     rob_table[r_ptr] <= '0;
                     r_ptr <= (r_ptr == 5'd15) ? 5'b0 : r_ptr + 1;
                 end
