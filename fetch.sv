@@ -17,7 +17,7 @@ module fetch(
 );
 
     logic [31:0] instr_icache;
-
+    logic [31:0] pc_prev;
 
     // This will be used to pass in and out of the skid buffer
     logic [63:0] data_next;
@@ -39,9 +39,15 @@ module fetch(
     
     always_ff @(posedge clk) begin
         if (reset) begin
-            valid_in_delayed <= 1'b0;
-        end else begin
             valid_in_delayed <= 1'b1;
+            pc_prev <= 32'd0;
+        end else begin
+            if (pc_in != pc_prev || pc_in == 0) begin
+                valid_in_delayed <= 1'b1;
+                pc_prev <= pc_in;
+            end else begin
+                valid_in_delayed <= 1'b0;
+            end
         end
     end
 

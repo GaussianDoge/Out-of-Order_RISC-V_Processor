@@ -22,7 +22,7 @@ module decode(
     );
     
     // track status
-    logic sent;
+    //logic sent;
 
     //  Future signals
     logic [4:0] rs1_next;
@@ -39,7 +39,8 @@ module decode(
     logic [6:0] func7_next;
     
     // Combinational Section
-    assign ready_in = sent||ready_in_reset;
+    //assign ready_in = sent||ready_in_reset;
+    assign ready_in = ready_out;
 
     ImmGen immgen (
         .instr(instr),
@@ -78,7 +79,7 @@ module decode(
             data_out.func3 = 3'b0;
             data_out.func7 = 7'b0;
             
-            sent = 1'b0;
+            //sent = 1'b0;
         end else begin
             // Handle upstream
             if (valid_in && ready_in) begin
@@ -96,16 +97,18 @@ module decode(
                 data_out.fu_mem = fu_mem_next;
                 data_out.fu_alu = fu_alu_next;
                 data_out.fu_br = fu_br_next;
-            end 
-            
-            // Handle downstream
-            if (ready_out && valid_out) begin
-                sent = 1'b1;
-            end else if (sent && !ready_out) begin // triggered when downstream updated
-                sent = 1'b0;
             end else begin
-                // do nothing (keep to avoid bug)
+                valid_out = 1'b0;
             end
+            
+//            // Handle downstream
+//            if (ready_out && valid_out) begin
+//                sent = 1'b1;
+//            end else if (sent && !ready_out) begin // triggered when downstream updated
+//                sent = 1'b0;
+//            end else begin
+//                // do nothing (keep to avoid bug)
+//            end
         end
     end
     

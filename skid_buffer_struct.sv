@@ -22,18 +22,20 @@ module skid_buffer_struct #(
     logic   valid_out_sig;
     T       buffer;
 
-    assign ready_in = ready_out || !valid_out_sig;
+    //assign ready_in = ready_out && !valid_out_sig;
     assign valid_out = valid_out_sig;
-    assign data_out = valid_out_sig ? buffer : data_in;
+    assign data_out = buffer;
     
     always_ff @ (posedge clk) begin
         if (reset || mispredict) begin
+            ready_in <= 1'b1;
             valid_out_sig <= 1'b0;
             buffer <= 0;
         end else begin
             // handle upstream
             if (valid_in && ready_in) begin
                 buffer <= data_in;
+                ready_in <= ready_out;
                 valid_out_sig <= 1'b1;
             end else if (ready_out) begin
                 valid_out_sig <= 1'b0;

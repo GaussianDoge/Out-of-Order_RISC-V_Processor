@@ -36,7 +36,7 @@ module tb_processor;
         // you don't need to do anything here.
 
         // Hold reset for a few cycles
-        repeat (5) @(posedge clk);
+        repeat (2) @(posedge clk);
         reset = 1'b0;
 
         // Let the program run for some cycles (adjust as needed)

@@ -6,12 +6,14 @@ module processor(
     );
     
     // General Signals
-    logic [31:0] pc = 32'd0;
+    logic [31:0] pc;
     logic mispredict;
     logic [4:0]  mispredict_tag;
     
     always_ff @(posedge clk) begin
-        if (frontend_valid_out && rename_ready_in && !mispredict) begin
+        if (reset) begin
+            pc <= 32'd0;
+        end else if (pc <= 12 || frontend_valid_out && rename_ready_in && !mispredict) begin
             pc <= pc + 4;
         end
     end
