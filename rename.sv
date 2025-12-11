@@ -63,6 +63,9 @@ module rename(
             data_out <= '0;
             valid_out <= 1'b0;
         end else begin
+            if (valid_out && ready_out) begin
+                valid_out <= 1'b0;
+            end
             if (rename_en && branch) begin
                 re_list <= list;
                 re_map <= map;
@@ -94,8 +97,6 @@ module rename(
                     data_out.pd_new <= '0;
                 end 
                 valid_out <= 1'b1;
-            end else if (ready_out) begin
-                valid_out <= 1'b0;
             end
         end
     end

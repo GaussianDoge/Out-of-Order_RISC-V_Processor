@@ -72,6 +72,7 @@ module dispatch(
     end
     
     // ALU RS Buffer
+    logic alu_buf_ready_in;
     logic alu_buf_valid_out;
     logic alu_buf_ready_out;
     rename_data alu_buf_data;
@@ -80,7 +81,7 @@ module dispatch(
         .clk(clk), .reset(reset),
         .mispredict(mispredict),
         .valid_in(valid_in && is_alu), 
-        .ready_in(),
+        .ready_in(alu_buf_ready_in),
         .data_in(data_in),
         .valid_out(alu_buf_valid_out),
         .ready_out(alu_buf_ready_out),
@@ -88,6 +89,7 @@ module dispatch(
     );
 
     // Branch RS Buffer
+    logic b_buf_ready_in;
     logic b_buf_valid_out;
     logic b_buf_ready_out;
     rename_data b_buf_data;
@@ -96,7 +98,7 @@ module dispatch(
         .clk(clk), .reset(reset),
         .mispredict(mispredict),
         .valid_in(valid_in && is_b), 
-        .ready_in(), 
+        .ready_in(b_buf_ready_in), 
         .data_in(data_in),
         .valid_out(b_buf_valid_out),
         .ready_out(b_buf_ready_out),
@@ -104,6 +106,7 @@ module dispatch(
     );
 
     // LSU RS Buffer
+    logic lsu_buf_ready_in;
     logic lsu_buf_valid_out;
     logic lsu_buf_ready_out;
     rename_data lsu_buf_data;
@@ -112,7 +115,7 @@ module dispatch(
         .clk(clk), .reset(reset),
         .mispredict(mispredict),
         .valid_in(valid_in && is_mem), 
-        .ready_in(), 
+        .ready_in(lsu_buf_ready_in), 
         .data_in(data_in),
         .valid_out(lsu_buf_valid_out),
         .ready_out(lsu_buf_ready_out),
@@ -120,7 +123,7 @@ module dispatch(
     );
 
     // Rename Stall Logic
-    assign ready_in = !(alu_buf_valid_out || b_buf_valid_out || lsu_buf_valid_out);
+    assign ready_in = alu_buf_ready_in && b_buf_ready_in && lsu_buf_ready_in;
     
     // Priority Logic
     rename_data active_packet;
