@@ -103,17 +103,17 @@ module fu_mem(
                 end else if (data_in.Opcode == 7'b0000011 && !load_en) begin // lw
                     data_out.fu_mem_ready = 1'b0;
                     data_out.fu_mem_done = 1'b0;
-                    data_out.p_mem = data_in.pd;
+                    //data_out.p_mem = data_in.pd;
                     data_out.rob_fu_mem = data_in.rob_index;
                 end
             end
-            if (valid && load_en) begin
-                data_out.fu_mem_ready = 1'b1;      // free again
-                data_out.fu_mem_done  = 1'b1;
-                data_out.p_mem        = pd_reg;
-                data_out.rob_fu_mem   = rob_reg;
-                data_out.data         = data_mem;
-            end
+//            if (valid && load_en) begin
+//                data_out.fu_mem_ready = 1'b1;      // free again
+//                data_out.fu_mem_done  = 1'b1;
+//                data_out.p_mem        = pd_reg;
+//                data_out.rob_fu_mem   = rob_reg;
+//                data_out.data         = data_mem;
+//            end
         end
     end
     
@@ -144,15 +144,13 @@ module fu_mem(
         
         .addr(addr),
         .issued(issued),
-        .Opcode(data_in.Opcode),
-        .func3(data_in.func3),
-        .rob_index(data_in.rob_index),
+        .data_in(data_in),
         
         // From LSQ for S-type
         .store_wb(store_wb),
         .lsq_in(lsq_out),
         
-        .data_out(data_mem),
+        .data_out(data_out),
         .valid(valid)
     );
     

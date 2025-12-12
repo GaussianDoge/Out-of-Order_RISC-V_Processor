@@ -8,23 +8,29 @@ module data_memory(
     // From FU Mem
     input logic [31:0] addr,
     input logic issued,
-    input logic [6:0] Opcode,
-    input logic [2:0] func3,
-    input logic [4:0] rob_index,
+    input rs_data data_in,
     
     // From LSQ for S-type
     input logic store_wb,
     input lsq lsq_in,
     
     // Output
-    output logic [31:0] data_out,
+    output mem_data data_out,
     output logic valid
 );
+    logic [6:0] Opcode;
+    logic [2:0] func3;
+    logic [4:0] rob_index;
+    assign Opcode = data_in.Opcode;
+    assign func3 = data_in.func3;
+    assign rob_index = data_in.rob_index;
+    
     logic [7:0] data_mem [0:102400]; // 100 KB memory
     logic valid_2cycles;
     logic [31:0] addr_reg;
     logic [2:0]  func3_reg;
     logic [4:0] pre_rob_index = 4'b1111;
+    
     
     logic load_issue;
     assign load_issue = issued && (Opcode == 7'b0000011) && (pre_rob_index != rob_index);
@@ -66,11 +72,21 @@ module data_memory(
             if (valid_2cycles) begin
                 valid <= 1'b1;
                 pre_rob_index <= rob_index;
+                
+                
                 if (func3_reg == 3'b100) begin // lbu
-                    data_out <= {{24{1'b0}}, data_mem[addr_reg]};
+                    data_out.data <= {{24{1'b0}}, data_mem[addr_reg]};
+                    data_out.p_mem <= data_in.pd;
+                    data_out.fu_mem_ready <= 1'b1;      // free again
+                    data_out.fu_mem_done  <= 1'b1;
+                    data_out.rob_fu_mem <= data_in.rob_index;
                 end else if (func3_reg == 3'b010) begin // lw
-                    data_out <= {data_mem[addr_reg], data_mem[addr_reg+1],
+                    data_out.data <= {data_mem[addr_reg], data_mem[addr_reg+1],
                                   data_mem[addr_reg+2], data_mem[addr_reg+3]};
+                    data_out.p_mem <= data_in.pd;
+                    data_out.fu_mem_ready <= 1'b1;      // free again
+                    data_out.fu_mem_done  <= 1'b1;
+                    data_out.rob_fu_mem <= data_in.rob_index;
                     $display("Load Word");
                     $display("M[%5d]=%32h", addr_reg, {data_mem[addr_reg], data_mem[addr_reg+1],
                                   data_mem[addr_reg+2], data_mem[addr_reg+3]});
