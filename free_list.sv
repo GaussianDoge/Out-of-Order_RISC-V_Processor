@@ -23,8 +23,8 @@ parameter int DEPTH = 96
     output logic [6:0] list_out [0:DEPTH-1]
 );
 
-    logic [6:0] list [0:DEPTH];
-    logic [6:0]  w_ptr, r_ptr;  
+    logic [6:0] list [0:DEPTH-1];
+    logic [6:0] w_ptr, r_ptr;
     logic [6:0] ctr;
     
     // Snapshot Outputs
@@ -54,9 +54,9 @@ parameter int DEPTH = 96
             w_ptr    <= 0;
             r_ptr    <= 0;
             ctr      <= 7'd96;
-            // Initialize with valid register IDs (1..96)
+            // Start allocation at p32 as p0-p31 are reserved for x0-x31
             for (int i = 0; i < DEPTH; i++) begin
-                list[i] <= i + 1;
+                list[i] <= i + 32;
             end
         end else begin
             // Mispredict case
