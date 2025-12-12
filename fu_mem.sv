@@ -33,10 +33,11 @@ module fu_mem(
     logic store_wb;
     lsq lsq_out;
     logic lsq_full;
+    logic new_lsq_store;
     
     always_comb begin
         // L-type and S-type instructions
-        if (data_in.Opcode == 7'b0000011) begin
+        if (data_in.Opcode == 7'b0100011) begin
             addr = ps1_data + data_in.imm;
         end else begin
             addr = '0;
@@ -66,7 +67,10 @@ module fu_mem(
         end
     end
     
-    always_comb begin   
+    always_comb begin
+        if (reset || mispredict) begin
+            new_lsq_store = 1'b0;
+        end
         data_out.fu_mem_ready = 1'b1;
         data_out.fu_mem_done  = 1'b0;
         data_out.p_mem = '0;
@@ -100,13 +104,16 @@ module fu_mem(
                     data_out.fu_mem_ready = 1'b1;
                     data_out.fu_mem_done = 1'b1;
                     data_out.rob_fu_mem = data_in.rob_index;
+                    new_lsq_store = ~new_lsq_store;
                 end else if (data_in.Opcode == 7'b0000011 && !load_en) begin // lw
                     data_out.fu_mem_ready = 1'b0;
                     data_out.fu_mem_done = 1'b0;
                     data_out.p_mem = data_in.pd;
                     data_out.rob_fu_mem = data_in.rob_index;
+                    new_lsq_store = ~new_lsq_store;
                 end
             end
+
             if (valid && load_en) begin
                 data_out.fu_mem_ready = 1'b1;      // free again
                 data_out.fu_mem_done  = 1'b1;
@@ -135,7 +142,8 @@ module fu_mem(
         .rob_head(rob_head),
         .store_wb(store_wb),
         .data_out(lsq_out),
-        .full(lsq_full) 
+        .full(lsq_full),
+        .new_lsq_store(new_lsq_store)
     );
     
     data_memory u_dmem (

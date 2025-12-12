@@ -78,6 +78,7 @@ module processor(
     // Signals connecting ROB to Dispatch
     logic [4:0] rob_alloc_ptr;
     logic rob_full;
+    logic [4:0] rob_head;
 
     // Writeback Signals (CDB)
     alu_data alu_data_out;
@@ -149,6 +150,8 @@ module processor(
         .br_mispredict(b_data_out.mispredict),
         .br_mispredict_tag(b_data_out.mispredict_tag),
         
+        .head(rob_head),
+
         // Outputs (Global Control & Commit)
         .mispredict(mispredict),
         .mispredict_tag(mispredict_tag),
@@ -293,6 +296,8 @@ module processor(
         .mem_issued(mem_issued), .mem_rs_data(lsu_rs_data_out),
 
         // From ROB
+        .retired(rob_retire_valid),
+        .rob_head(rob_head),
         .curr_rob_tag(rob_alloc_ptr),
         .mispredict(mispredict),
         .mispredict_tag(mispredict_tag),

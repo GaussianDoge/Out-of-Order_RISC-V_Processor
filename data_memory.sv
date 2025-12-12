@@ -18,7 +18,7 @@ module data_memory(
     output logic [31:0] data_out,
     output logic valid
 );
-    logic [7:0] data_mem [0:2047];
+    logic [7:0] data_mem [0:102400]; // 100 KB memory
     logic valid_2cycles;
     logic [31:0] addr_reg;
     logic [2:0]  func3_reg;
@@ -30,7 +30,7 @@ module data_memory(
             data_out <= '0;
             valid <= 1'b0;
             valid_2cycles <= 1'b0;
-            for (int i = 0; i <= 2047; i++) begin
+            for (int i = 0; i <= 102400; i++) begin
                 data_mem[i] <= '0;
             end
         end else begin
