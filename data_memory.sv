@@ -30,20 +30,20 @@ module data_memory(
     assign rob_index = data_in.rob_index;
     
     logic [7:0] data_mem [0:102400]; // 100 KB memory
-    logic valid_2cycles;
+    // logic valid_2cycles;
     logic [31:0] addr_reg;
-    logic [2:0]  func3_reg;
-    logic [4:0] pre_rob_index = 5'b11111;
+    // logic [2:0]  func3_reg;
+    logic [4:0] pre_rob_index;
     
     
-    logic load_issue;
-    assign load_issue = issued && (Opcode == 7'b0000011) && (pre_rob_index != rob_index);
+    // logic load_issue;
+    // assign load_issue = issued && (Opcode == 7'b0000011) && (pre_rob_index != rob_index);
         
     always_ff @(posedge clk or posedge reset) begin
         if (reset) begin
             data_out <= '0;
             valid <= 1'b0;
-            valid_2cycles <= 1'b0;
+            // valid_2cycles <= 1'b0;
             pre_rob_index <= 5'b11111;
             for (int i = 0; i <= 102400; i++) begin
                 data_mem[i] <= '0;
@@ -52,13 +52,13 @@ module data_memory(
             valid <= 1'b0;
             if (store_wb) begin
                 if (lsq_in.sw_sh_signal == 1'b0) begin // sw
-                    data_mem[lsq_in.addr] <= lsq_in.ps2_data[31:24];
-                    data_mem[lsq_in.addr+1] <= lsq_in.ps2_data[23:16];
-                    data_mem[lsq_in.addr+2] <= lsq_in.ps2_data[15:8];
-                    data_mem[lsq_in.addr+3] <= lsq_in.ps2_data[7:0];
+                    data_mem[lsq_in.addr] <= lsq_in.ps2_data[7:0];
+                    data_mem[lsq_in.addr+1] <= lsq_in.ps2_data[15:8];
+                    data_mem[lsq_in.addr+2] <= lsq_in.ps2_data[23:16];
+                    data_mem[lsq_in.addr+3] <= lsq_in.ps2_data[31:24];
                 end else if (lsq_in.sw_sh_signal == 1'b1) begin // sh
-                    data_mem[lsq_in.addr] <= lsq_in.ps2_data[15:8];
-                    data_mem[lsq_in.addr+1] <= lsq_in.ps2_data[7:0];
+                    data_mem[lsq_in.addr] <= lsq_in.ps2_data[7:0];
+                    data_mem[lsq_in.addr+1] <= lsq_in.ps2_data[15:8];
                 end
                 data_out.fu_mem_ready <= 1'b1;      // free again
                 // no need retire we already done in LSQ
@@ -74,28 +74,28 @@ module data_memory(
             //valid_2cycles <= load_issue && load_mem;
 
             // When v2==1, 2 cycles after load_issue, return data
-            if (load_mem && !lsq_load.store) begin
+            if (!store_wb && load_mem && !lsq_load.store && pre_rob_index != lsq_load.rob_tag) begin
                 valid <= 1'b1;
-                
+                pre_rob_index <= lsq_load.rob_tag;
                 if (lsq_load.func3 == 3'b100) begin // lbu
-                    data_out.data <= {{24{1'b0}}, data_mem[addr_reg]};
+                    data_out.data <= {{24{1'b0}}, data_mem[lsq_load.addr]};
                     data_out.p_mem <= lsq_load.pd;
                     data_out.fu_mem_ready <= 1'b1;      // free again
                     data_out.fu_mem_done  <= 1'b1;      // retire
                     data_out.rob_fu_mem <= lsq_load.rob_tag;
                     
                     $display("Load Byte Unsigned");
-                    $display("M[%5d]=%32h", addr_reg, {{24{1'b0}}, data_mem[addr_reg]});
+                    $display("M[%5d]=%32h", lsq_load.addr, {{24{1'b0}}, data_mem[lsq_load.addr]});
                 end else if (lsq_load.func3 == 3'b010) begin // lw
-                    data_out.data <= {data_mem[addr_reg], data_mem[addr_reg+1],
-                                  data_mem[addr_reg+2], data_mem[addr_reg+3]};
-                    data_out.p_mem <= data_in.pd;
+                    data_out.data <= {data_mem[lsq_load.addr+3], data_mem[lsq_load.addr+2],
+                                  data_mem[lsq_load.addr+1], data_mem[lsq_load.addr]};
+                    data_out.p_mem <= lsq_load.pd;
                     data_out.fu_mem_ready <= 1'b1;      // free again
                     data_out.fu_mem_done  <= 1'b1;      // retire
-                    data_out.rob_fu_mem <= data_in.rob_index;
+                    data_out.rob_fu_mem <= lsq_load.rob_tag;
                     $display("Load Word");
-                    $display("M[%5d]=%32h", addr_reg, {data_mem[addr_reg], data_mem[addr_reg+1],
-                                  data_mem[addr_reg+2], data_mem[addr_reg+3]});
+                    $display("M[%5d]=%32h", lsq_load.addr, {data_mem[300], data_mem[301],
+                                  data_mem[302], data_mem[303]});
                 end
             end
         end

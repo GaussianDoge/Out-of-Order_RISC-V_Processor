@@ -42,8 +42,10 @@ module fu_mem(
     
     // Forwarding Wires
     logic [31:0] fwd_data;
+    logic [6:0] forward_load_pd;
+    logic [4:0] forward_rob_index;
     logic fwd_valid;
-    logic safe_to_mem;
+    logic load_mem;
     
     always_comb begin
         // L-type and S-type instructions
@@ -80,10 +82,10 @@ module fu_mem(
     
     always_comb begin   
         data_out.fu_mem_ready = 1'b1;
-        data_out.fu_mem_done  = 1'b0;
-        data_out.p_mem = '0;
-        data_out.rob_fu_mem = '0;
-        data_out.data = '0;
+        //data_out.fu_mem_done  = 1'b0;
+        //data_out.p_mem = '0;
+        //data_out.rob_fu_mem = '0;
+        //data_out.data = '0;
         
         
         if (load_en) begin
@@ -108,11 +110,11 @@ module fu_mem(
                         data_out.fu_mem_done = 1'b1;
                         data_out.fu_mem_ready = 1'b1;      
                         data_out.data = fwd_data;         
-                        data_out.p_mem = data_in.pd;
-                        data_out.rob_fu_mem = data_in.rob_index;
+                        data_out.p_mem = forward_load_pd;
+                        data_out.rob_fu_mem = forward_rob_index;
                     end
                     // Memory hazard
-                    else if (!safe_to_mem) begin
+                    else if (!load_mem) begin
                         // Hazard detected. We stall ready, but we don't latch internally.
                         // Ideally RS should retry.
                         data_out.fu_mem_ready = 1'b0;
@@ -143,6 +145,8 @@ module fu_mem(
         
         // From PRF
         .ps2_data(ps2_data),
+
+        // From RS
         .issued(issued),
         .data_in(data_in),
         
@@ -152,19 +156,24 @@ module fu_mem(
         .store_wb(store_wb),
 
         .data_out(lsq_out),
+        .data_load(lsq_load),
         
         .load_forward_data(fwd_data),
+        .forward_load_pd(forward_load_pd),
+        .forward_rob_index(forward_rob_index),
+
         .load_forward_valid(fwd_valid),
-        .load_mem(safe_to_mem),
+        .load_mem(load_mem),
         
         .store_rob_tag(store_rob_tag),
         .store_lsq_done(store_lsq_done),
+
         .full(lsq_full) 
     );
     
     // Drive Memory only if safe and not FWD
-    logic dmem_issued;
-    assign dmem_issued = issued && (data_in.Opcode == 7'b0000011) && safe_to_mem && !fwd_valid;
+
+    
     
     data_memory u_dmem (
         .clk(clk),
@@ -178,7 +187,7 @@ module fu_mem(
         .lsq_in(lsq_out),
         
         // L type load enable
-        .load_mem(dmem_issued),
+        .load_mem(load_mem),
         .lsq_load(lsq_load),
         
         .data_out(data_out),

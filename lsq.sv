@@ -25,13 +25,21 @@ module lsq(
     input logic [4:0] rob_head,
     output logic store_wb,
 
+    // Writebacked data
     output lsq data_out,
-    output lsq data_load,
+    
 
-    // To do: data forwarding for load instructions
+    // forwarding
     output logic [31:0] load_forward_data,
+    output logic [6:0] forward_load_pd,
+    output logic [4:0] forward_rob_index,
+
+    // loading from memory
+    output lsq data_load,
     output logic load_forward_valid,
     output logic load_mem,
+
+    // Retirement
     output logic [4:0] store_rob_tag, // for lsq writeback
     output logic store_lsq_done,
     output logic full
@@ -45,6 +53,10 @@ module lsq(
     assign addr = ps1_data + imm_in;
     
     assign full = (ctr == 8);
+
+    logic incompleted_load;
+    logic unissued_store;
+    logic lsq_issued;
 
     // rs_data stall_load_data;
     // logic no_stall_load;
@@ -92,6 +104,7 @@ module lsq(
                         lsq_arr[i].ps2_data <= ps2_data;
                         lsq_arr[i].valid_data <= 1'b1;
                         lsq_arr[i].pd <= data_in.pd;
+                        lsq_arr[i].func3 <= data_in.func3;
 
                         if (data_in.Opcode == 7'b0100011) begin // store
                             lsq_arr[i].store <= 1'b1;
@@ -148,87 +161,215 @@ module lsq(
         end 
     end
 
+    assign incompleted_load = (lsq_arr[0].valid_data && !lsq_arr[0].store)
+                              || (lsq_arr[1].valid_data && !lsq_arr[1].store)
+                              || (lsq_arr[2].valid_data && !lsq_arr[2].store)
+                              || (lsq_arr[3].valid_data && !lsq_arr[3].store)
+                              || (lsq_arr[4].valid_data && !lsq_arr[4].store)
+                              || (lsq_arr[5].valid_data && !lsq_arr[5].store)
+                              || (lsq_arr[6].valid_data && !lsq_arr[6].store)
+                              || (lsq_arr[7].valid_data && !lsq_arr[7].store);
+
     always_comb begin
         // Default
+        if (reset) begin
+            load_forward_data = '0;
+            load_forward_valid = 0;
+            load_mem = 1'b0;
+            data_load = '0;
+        end
+
         load_forward_data = '0;
         load_forward_valid = 0;
         load_mem = 1'b0;
         data_load = '0;
-        // Issuing Load
-        if (issued && data_in.Opcode == 7'b0000011) begin
+        
+        unissued_store = 1'b0;
+        lsq_issued = 1'b0;
+        if (incompleted_load) begin
             logic [2:0] temp_ptr;
             temp_ptr = r_ptr;
-
-            // Loop through LSQ
+            
             for (int i = 0; i <= 7; i++) begin
-                if (lsq_arr[temp_ptr].pc < data_in.pc
-                    && lsq_arr[temp_ptr].valid_data 
-                    && lsq_arr[temp_ptr].store) begin
-                        // Data isn't valid yet
-                        if(!lsq_arr[temp_ptr].valid_data) begin
-                            load_mem = 1'b0;
-                            load_forward_valid = 1'b0;
-                        end else begin
-                            // Logic for checking if a load is in the right range (LBU)
-                            logic [31:0] store_addr = lsq_arr[temp_ptr].addr;
-                            logic is_word = !lsq_arr[temp_ptr].sw_sh_signal;
-                            logic [31:0] limit = is_word ? 3 : 1;
-                            logic [31:0] offset;
-                            if (data_in.func3 == 3'b100) begin // lbu
-                                offset = 0;
-                            end else if (data_in.func3 == 3'b010) begin // lw
-                                offset = 3;
-                            end
-
-                            // Check if Load Address falls inside Store Range
-                            if (addr >= store_addr && addr + offset <= (store_addr + limit)) begin
-                                // If address overlaps
-                                // SW to LW (Word to Word) - Forward
-                                $display("LSQ: Load Forwarding from Store rob=%0d addr=0x%08h data=0x%08h To Load rob=%0d addr=0x%08h",
-                                    lsq_arr[temp_ptr].rob_tag, lsq_arr[temp_ptr].addr, lsq_arr[temp_ptr].ps2_data, data_in.rob_index, addr);
-                                if (addr == store_addr && data_in.func3 == 3'b010 && is_word) begin
-                                    load_forward_valid = 1'b1;
-                                    load_forward_data = lsq_arr[temp_ptr].ps2_data;
-                                    load_mem = 1'b0;
-                                end
-                                // SW/SH to LBU (Byte Extraction) - Forward as the byte is inside the store data
-                                else if (data_in.func3 == 3'b100) begin 
-                                    load_forward_valid = 1'b1;
-                                    load_mem = 1'b0;
-                                    
-                                    // Calculate byte offset (0, 1, 2, or 3) and extract byte & zero extend (LBU)
-                                    case (addr[1:0] - store_addr[1:0])
-                                        2'b00: load_forward_data = {24'b0, lsq_arr[temp_ptr].ps2_data[7:0]};
-                                        2'b01: load_forward_data = {24'b0, lsq_arr[temp_ptr].ps2_data[15:8]};
-                                        2'b10: load_forward_data = {24'b0, lsq_arr[temp_ptr].ps2_data[23:16]};
-                                        2'b11: load_forward_data = {24'b0, lsq_arr[temp_ptr].ps2_data[31:24]};
-                                    endcase
-                                end
-                                else begin
-                                    // Complex/Partial overlap not covered above (e.g. SH -> LW)
-                                    // Must Stall
-                                    load_mem = 1'b0; 
-                                end
-                            end else if (addr >= store_addr && addr <= (store_addr + limit)) begin // check for two incompleted overlap store
-                                // Previous perfect match not found
-                                // then fall into incompleted overlap case
-                                load_mem = 1'b1;
-                                load_forward_valid = 1'b0;
-                                $display("LSQ: Load Stalled due to incompleted overlap store");
-                            end
-                        end
-                end else if (!lsq_arr[temp_ptr].valid_data 
-                            && lsq_arr[temp_ptr].pc < data_in.pc) begin
-                    load_mem = 1'b0;
-                    load_forward_valid = 1'b0;
-                    $display("LSQ: Load Stalled load Rob=%0d",
-                        data_in.rob_index);
+                if (!lsq_arr[temp_ptr].valid_data) begin
+                    // any prev invalid data found, we wait
+                    unissued_store = 1'b1;
+                end else if (lsq_arr[temp_ptr].valid_data && !lsq_arr[temp_ptr].store) begin
+                    // found incompleted load
+                    unissued_store = 1'b0;
+                    break;
                 end
-                // Move to next entry in circular buffer
                 temp_ptr = (temp_ptr == 7) ? 0 : temp_ptr + 1;
+            end
+
+            if (!unissued_store) begin // no more unissued store before
+                logic [31:0] pc = lsq_arr[temp_ptr].pc;
+                logic [31:0] addr = lsq_arr[temp_ptr].addr;
+                logic [4:0] rob_index = lsq_arr[temp_ptr].rob_tag;
+                logic [2:0] func3 = lsq_arr[temp_ptr].func3;
+                forward_load_data(
+                    pc,
+                    addr,
+                    rob_index,
+                    func3,
+                    load_forward_data,
+                    load_forward_valid,
+                    load_mem
+                );
+
+                forward_load_pd = lsq_arr[temp_ptr].pd;
+                forward_rob_index = lsq_arr[temp_ptr].rob_tag;
+
+                if (load_forward_valid || load_mem) begin
+                    lsq_issued = 1'b1;
+                end else begin
+                    lsq_issued = 1'b0;
+                end
+
+                if (load_mem && !load_forward_valid) begin
+                    data_load <= lsq_arr[temp_ptr];
+                end
+                
+            end
+        end
+        // Issuing Load
+        if (!lsq_issued && issued && data_in.Opcode == 7'b0000011) begin
+            logic [31:0] pc = data_in.pc;
+            logic [31:0] addr = ps1_data + imm_in;
+            logic [4:0] rob_index = data_in.rob_index;
+            logic [2:0] func3 = data_in.func3;
+            forward_load_data(
+                pc,
+                addr,
+                rob_index,
+                func3,
+                load_forward_data,
+                load_forward_valid,
+                load_mem
+            );
+
+            forward_load_pd = data_in.pd;;
+            forward_rob_index = data_in.rob_index;
+
+            if (load_mem && !load_forward_valid) begin
+                data_load.valid = 1'b1;
+                data_load.pc = pc;
+                data_load.addr = addr;
+                data_load.rob_tag = rob_index;
+                data_load.pd = data_in.pd;
+                data_load.func3 = func3;
+                data_load.store = 1'b0;
+                data_load.sw_sh_signal = 1'b0;
+                data_load.valid_data = 1'b1;
             end
         end
     end
+    
+    logic [2:0] task_temp_ptr;
+    task automatic forward_load_data(
+        input logic [31:0] pc,
+        input logic [31:0] addr,
+        input logic [4:0] rob_index,
+        input logic [2:0] func3,
+        output logic [31:0] load_data,
+        output logic forward_valid,
+        output logic load_from_mem
+    );
+        begin
+            logic task_unissued_store;
+            logic dependent;
+
+            load_data = '0;
+            dependent = 1'b0;
+            forward_valid = 1'b0;
+            load_from_mem = 1'b0;
+
+            task_temp_ptr = r_ptr;
+            task_unissued_store = 1'b0;
+            // Loop through LSQ
+            $display("******************Load ROB = %0d", rob_index);
+            for (int i = 0; i <= 7; i++) begin
+                $display("Checking Rob = %0d", lsq_arr[task_temp_ptr].rob_tag);
+                if (lsq_arr[task_temp_ptr].pc < pc
+                    && lsq_arr[task_temp_ptr].valid_data 
+                    && lsq_arr[task_temp_ptr].store) begin
+                        // Logic for checking if a load is in the right range (LBU)
+                        logic [31:0] store_addr = lsq_arr[task_temp_ptr].addr;
+                        logic is_word = !lsq_arr[task_temp_ptr].sw_sh_signal;
+                        logic [31:0] limit = is_word ? 3 : 1;
+                        logic [31:0] offset;
+                        if (func3 == 3'b100) begin // lbu
+                            offset = 0;
+                        end else if (data_in.func3 == 3'b010) begin // lw
+                            offset = 3;
+                        end
+
+                        // Check if Load Address falls inside Store Range
+                        if (addr >= store_addr && addr + offset <= (store_addr + limit)) begin
+                            // If address overlaps
+                            // SW to LW (Word to Word) - Forward
+                                $display("LSQ: Load Forwarding from Store rob=%0d addr=0x%08h data=0x%08h To Load rob=%0d addr=0x%08h",
+                                lsq_arr[task_temp_ptr].rob_tag, lsq_arr[task_temp_ptr].addr, lsq_arr[task_temp_ptr].ps2_data, rob_index, addr);
+                            if (addr == store_addr && data_in.func3 == 3'b010 && is_word) begin
+                                forward_valid = 1'b1;
+                                load_data = lsq_arr[task_temp_ptr].ps2_data;
+                                load_from_mem = 1'b0;
+                                break;
+                            end
+                            // SW/SH to LBU (Byte Extraction) - Forward as the byte is inside the store data
+                            else if (data_in.func3 == 3'b100) begin 
+                                forward_valid = 1'b1;
+                                load_from_mem = 1'b0;
+                                
+                                // Calculate byte offset (0, 1, 2, or 3) and extract byte & zero extend (LBU)
+                                case (addr[1:0] - store_addr[1:0])
+                                    2'b00: load_data = {24'b0, lsq_arr[task_temp_ptr].ps2_data[7:0]};
+                                    2'b01: load_data = {24'b0, lsq_arr[task_temp_ptr].ps2_data[15:8]};
+                                    2'b10: load_data = {24'b0, lsq_arr[task_temp_ptr].ps2_data[23:16]};
+                                    2'b11: load_data = {24'b0, lsq_arr[task_temp_ptr].ps2_data[31:24]};
+                                endcase
+                                break;
+                            end
+                        end else if ((addr >= store_addr && addr <= (store_addr + limit)) 
+                                    ||(addr <= store_addr && addr + offset <= (store_addr + limit))) begin
+                            load_from_mem = 1'b0;
+                            forward_valid = 1'b0;
+                            load_data = '0;
+                            dependent = 1'b1;
+                            $display("Dependency detected!");
+                            break;
+                        end else begin
+                            $display("***********************************");
+                            $display("Addr: %0d  Store: %d, Limit: %0d", addr, store_addr, limit);
+                        end
+                end else if (lsq_arr[task_temp_ptr].pc < pc && !lsq_arr[task_temp_ptr].valid_data ) begin // unissued pre instructions
+                    load_from_mem = 1'b0;
+                    forward_valid = 1'b0;
+                    task_unissued_store = 1'b1;
+                    $display("LSQ: Load Stalled load Rob=%0d due to Rob=%0d", rob_index, lsq_arr[task_temp_ptr].rob_tag);
+                    break;
+                end else if (lsq_arr[task_temp_ptr].pc >= pc) begin
+                    load_from_mem = 1'b0;
+                    forward_valid = 1'b0;
+                    dependent = 1'b0;
+                    $display("No dependency");
+                    break;
+                end
+                // Move to next entry in circular buffer
+                task_temp_ptr = (task_temp_ptr == 7) ? 0 : task_temp_ptr + 1;
+            end
+
+            if (task_unissued_store) begin
+                load_from_mem = 1'b0;
+                forward_valid = 1'b0;
+                load_data = '0;
+            end else if (!forward_valid && !task_unissued_store && !dependent) begin // need to load from memory
+                load_from_mem = 1'b1;
+                load_data = '0;
+                $display("Loading from memory Rob=%0d", rob_index);
+            end
+        end
+    endtask
 
 
 // Delete it if you don't need it
