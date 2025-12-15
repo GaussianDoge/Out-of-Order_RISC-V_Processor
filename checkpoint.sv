@@ -21,23 +21,24 @@ module checkpoint(
     // Output
     output logic checkpoint_valid,
     output checkpoint snapshot
-    );
-
-
-    checkpoint [3:0] checkpoint;
-    
+);
+    // 4 Checkpoints
+    checkpoint [3:0] chkpt;
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            checkpoint <= '0;
+            chkpt <= '0;
         end else begin
-            checkpoint_valid <= 1'b0;
+//            checkpoint_valid <= 1'b0;
+            // When a new branch is renamed/dispatched
             if (branch_detect) begin
                 for (int i = 0; i < 4; i++) begin
-                    if (!checkpont[i].valid) begin
-                        checkpoint[i].pc <= branch_pc;
-                        checkpoint[i].rob_tag <= branch_rob_tag;
-                        checkpoint[i].reg_rdy_table <= reg_rdy_snap_shot;
+                    if (!chkpt[i].valid) begin
+                        chkpt[i].valid = 1'b1;
+                        chkpt[i].pc <= branch_pc;
+                        chkpt[i].rob_tag <= branch_rob_tag;
+                        chkpt[i].reg_rdy_table <= reg_rdy_snap_shot;
+                        break; // Stop after filling one slot
                     end
                 end
             end
@@ -45,16 +46,19 @@ module checkpoint(
     end
 
     always_comb begin
+        // Default outputs to prevent latches
+        snapshot = '0;
+        checkpoint_valid = 1'b0;
         if (mispredict) begin
+            // Search for the snapshot belonging to the mispredicted branch
             for (int i = 0; i < 4; i++) begin
-                if (checkpoint[i].valid && checkpoint[i].rob_tag == mispredict_tag) begin
-                    snapshot = checkpoint[i];
+                if (chkpt[i].valid && chkpt[i].rob_tag == mispredict_tag) begin
+                    snapshot = chkpt[i];
                     checkpoint_valid = 1'b1;
                     break;
                 end
             end
         end
     end
-
-
+    
 endmodule

@@ -65,7 +65,7 @@ module processor(
    logic checkpoint_valid;
    assign branch_detect = rename_data_out.fu_br && rename_valid_out;
    reg [127:0] reg_rdy_snap_shot;
-   checkpoint checkpoint;
+   checkpoint snapshot_out;
 
 
     
@@ -87,7 +87,7 @@ module processor(
 
        // Output
        .checkpoint_valid(checkpoint_valid),
-       .snapshot(checkpoint)
+       .snapshot(snapshot_out)
    );
 
 
