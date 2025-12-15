@@ -149,27 +149,6 @@ module lsq(
                         
                     end
                 end
-
-                
-
-                // if (data_in.Opcode == 7'b0100011) begin
-                //     lsq_arr[w_ptr].valid <= 1'b1;
-                //     lsq_arr[w_ptr].addr <= ps1_data + imm_in;
-                //     lsq_arr[w_ptr].rob_tag <= data_in.rob_index;
-                //     lsq_arr[w_ptr].ps2_data <= ps2_data;
-                //     lsq_arr[w_ptr].pd <= data_in.pd;
-                //     if (data_in.func3 == 3'b010) begin // sw
-                //         lsq_arr[w_ptr].sw_sh_signal <= 1'b0;
-                //     end else if (data_in.func3 == 3'b001) begin // sh
-                //         lsq_arr[w_ptr].sw_sh_signal <= 1'b1;
-                //     end
-                //     ctr <= ctr + 1;
-                //     w_ptr <= (w_ptr == 7) ? 0 : w_ptr + 1;
-                    
-                //     store_done = 1'b1;
-                //     store_ready = 1'b1;
-                //     store_rob_tag = data_in.rob_index;
-                // end
             end 
             if (retired) begin
                 if (lsq_arr[r_ptr].valid_data && rob_head == lsq_arr[r_ptr].rob_tag && lsq_arr[r_ptr].store) begin
@@ -231,10 +210,10 @@ module lsq(
             end
 
             if (!unissued_store) begin // no more unissued store before
-                logic [31:0] pc = lsq_arr[temp_ptr].pc;
-                logic [31:0] addr = lsq_arr[temp_ptr].addr;
-                logic [4:0] rob_index = lsq_arr[temp_ptr].rob_tag;
-                logic [2:0] func3 = lsq_arr[temp_ptr].func3;
+                automatic logic [31:0] pc = lsq_arr[temp_ptr].pc;
+                automatic logic [31:0] addr = lsq_arr[temp_ptr].addr;
+                automatic logic [4:0] rob_index = lsq_arr[temp_ptr].rob_tag;
+                automatic logic [2:0] func3 = lsq_arr[temp_ptr].func3;
                 forward_load_data(
                     pc,
                     addr,
@@ -262,10 +241,10 @@ module lsq(
         end
         // Issuing Load
         if (!lsq_issued && issued && data_in.Opcode == 7'b0000011) begin
-            logic [31:0] pc = data_in.pc;
-            logic [31:0] addr = ps1_data + imm_in;
-            logic [4:0] rob_index = data_in.rob_index;
-            logic [2:0] func3 = data_in.func3;
+            automatic logic [31:0] pc = data_in.pc;
+            automatic logic [31:0] addr = ps1_data + imm_in;
+            automatic logic [4:0] rob_index = data_in.rob_index;
+            automatic logic [2:0] func3 = data_in.func3;
             forward_load_data(
                 pc,
                 addr,
@@ -338,7 +317,7 @@ module lsq(
                             // SW to LW (Word to Word) - Forward
                                 $display("LSQ: Load Forwarding from Store rob=%0d addr=0x%0d data=0x%08h To Load rob=%0d addr=0x%0d",
                                 lsq_arr[task_temp_ptr].rob_tag, lsq_arr[task_temp_ptr].addr, lsq_arr[task_temp_ptr].ps2_data, rob_index, addr);
-                            if (addr == store_addr && data_in.func3 == 3'b010 && is_word) begin
+                            if (addr == store_addr && func3 == 3'b010 && is_word) begin
                                 forward_valid = 1'b1;
                                 load_data = lsq_arr[task_temp_ptr].ps2_data;
                                 load_from_mem = 1'b0;
@@ -385,6 +364,7 @@ module lsq(
                     $display("No dependency");
                     break;
                 end
+
                 // Move to next entry in circular buffer
                 task_temp_ptr = (task_temp_ptr == 7) ? 0 : task_temp_ptr + 1;
             end
@@ -400,66 +380,4 @@ module lsq(
             end
         end
     endtask
-
-
-// Delete it if you don't need it
-//     rs_data check_load;
-//     assign check_load = (no_stall_load) ? data_in : stall_load_data;
-
-//     always_comb begin
-//         if (issued || retired) begin
-//             // load instructions search LSQ for matching store
-//             if (check_load.Opcode == 7'b0000011) begin
-//                 logic [2:0] temp_ptr;
-//                 temp_ptr = r_ptr;
-//                 logic [31:0] offset;
-//                 if (check_load.func3 == 3'b100) begin // lbu
-//                     offset = 0;
-//                 end else if (check_load.func3 == 3'b010) begin // lw
-//                     offset = 3;
-//                 end
-//                 for (logic [2:0] i = 0; i <= 7; i++) begin
-//                     if (lsq_arr[i].valid) begin // take the latest value to forward
-//                         // check if addr is in range of store instruction
-//                         if (lsq_arr[i].pc < check_load.pc
-//                         && lsq_arr[i].valid_data
-//                         && !lsq_arr[i].sw_sh_signal // SW type check
-//                         && lsq_arr[i].addr <= addr // addr range check
-//                         && lsq_arr[i].addr+3 >= addr+offset) begin
-
-//                             load_forward_data = lsq_arr[i].ps2_data;
-//                             load_forward_valid = 1'b1;
-//                             load_mem = 1'b0;
-
-//                         end else if (lsq_arr[i].pc < check_load.pc
-//                         && lsq_arr[i].valid_data
-//                         && lsq_arr[i].sw_sh_signal // SH type check
-//                         && lsq_arr[i].addr <= addr  // addr range check
-//                         && lsq_arr[i].addr+1 >= addr+offset) begin
-
-//                             load_forward_data = {16'b0, lsq_arr[i].ps2_data[15:0]};
-//                             load_forward_valid = 1'b1;
-//                             load_mem = 1'b0;
-                            
-//                         end else if (lsq_arr[i].pc < check_load.pc // we stall until all stores before are retired
-//                         && !lsq_arr[i].valid_data) begin 
-//                             load_forward_data = 32'b0;
-//                             load_forward_valid = 1'b0;
-//                         end
-//                     end else if (lsq_arr[i].valid) begin
-//                         load_forward_data = 32'b0;
-//                         load_forward_valid = 1'b0;
-//                     end
-//                     temp_ptr = (temp_ptr == 7) ? 0 : temp_ptr + 1;
-//                 end
-
-//                 if (load_forward_valid) begin
-//                     no_stall_load = 1'b1;
-//                 end else begin
-//                     no_stall_load = 1'b0;
-//                 end
-//             end
-//         end
-//     end
-    
  endmodule
