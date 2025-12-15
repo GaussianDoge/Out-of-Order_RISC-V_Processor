@@ -71,11 +71,13 @@ module fu_branch(
             if (issued) begin
                 if (data_in.Opcode == 7'b1100111) begin
                     if (data_in.func3 == 3'b000) begin // Jalr
+                        // Mispredict, since for JALR it is automatically assumed to be not taken unless we have a BTB
                         data_out.pc = data_in.imm + ps1_data;
                         data_out.data = data_in.pc + 4;
                         data_out.jalr_bne_signal = 1'b1;
                         data_out.p_b = data_in.pd;
-                        data_out.rob_fu_b = data_in.rob_index;
+                        data_out.mispredict = 1'b1;
+                        data_out.mispredict_tag = data_in.rob_index;
                     end
                 end else if (data_in.Opcode == 7'b1100011) begin
                     if (data_in.func3 == 3'b001) begin // Bne
