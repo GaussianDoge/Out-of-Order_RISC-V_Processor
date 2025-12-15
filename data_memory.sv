@@ -64,10 +64,10 @@ module data_memory(
                 end
                 data_out.fu_mem_ready <= 1'b1;      // free again
                 // no need retire we already done in LSQ
-                $display("=====================================");
-                $display("STORE_COMMIT pc=%8h rob=%0d addr=0x%0d data=0x%08h sw_sh=%0d",
-                    lsq_in.pc, lsq_in.rob_tag[4:0], lsq_in.addr, lsq_in.ps2_data, lsq_in.sw_sh_signal);
-                $display("M[%0d]=%8h", lsq_in.addr, lsq_in.ps2_data);
+                // $display("=====================================");
+                // $display("STORE_COMMIT pc=%8h rob=%0d addr=0x%0d data=0x%08h sw_sh=%0d",
+                //     lsq_in.pc, lsq_in.rob_tag[4:0], lsq_in.addr, lsq_in.ps2_data, lsq_in.sw_sh_signal);
+                // $display("M[%0d]=%8h", lsq_in.addr, lsq_in.ps2_data);
             end 
             // if (load_issue) begin
             //     addr_reg  <= addr;
@@ -87,9 +87,9 @@ module data_memory(
                     data_out.fu_mem_ready <= 1'b1;      // free again
                     data_out.fu_mem_done  <= 1'b1;      // retire
                     data_out.rob_fu_mem <= lsq_load.rob_tag;
-                    $display("=====================================");
-                    $display("Load Byte Unsigned PC=%8h", lsq_load.pc);
-                    $display("M[%0d]=%32h", lsq_load.addr, {{24{1'b0}}, data_mem[lsq_load.addr]});
+                    // $display("=====================================");
+                    // $display("Load Byte Unsigned PC=%8h", lsq_load.pc);
+                    // $display("M[%0d]=%32h", lsq_load.addr, {{24{1'b0}}, data_mem[lsq_load.addr]});
                 end else if (lsq_load.func3 == 3'b010) begin // lw
                     data_out.data <= {data_mem[lsq_load.addr+3], data_mem[lsq_load.addr+2],
                                   data_mem[lsq_load.addr+1], data_mem[lsq_load.addr]};
@@ -97,10 +97,10 @@ module data_memory(
                     data_out.fu_mem_ready <= 1'b1;      // free again
                     data_out.fu_mem_done  <= 1'b1;      // retire
                     data_out.rob_fu_mem <= lsq_load.rob_tag;
-                    $display("=====================================");
-                    $display("Load Word PC=%8h", lsq_load.pc);
-                    $display("M[%0d]=%32h", lsq_load.addr, {data_mem[lsq_load.addr+3], data_mem[lsq_load.addr+2],
-                                  data_mem[lsq_load.addr+1], data_mem[lsq_load.addr]});
+                    // $display("=====================================");
+                    // $display("Load Word PC=%8h", lsq_load.pc);
+                    // $display("M[%0d]=%32h", lsq_load.addr, {data_mem[lsq_load.addr+3], data_mem[lsq_load.addr+2],
+                    //               data_mem[lsq_load.addr+1], data_mem[lsq_load.addr]});
                 end
             end
         end
