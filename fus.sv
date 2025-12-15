@@ -96,7 +96,6 @@ module fus(
         
         // From ROB
         .curr_rob_tag(curr_rob_tag),
-        .mispredict(mispredict),
         .mispredict_tag(mispredict_tag),
         
         // From RS

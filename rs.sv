@@ -148,11 +148,10 @@ module rs(
                 
             end
             
-            valid_out <= 1'b0;
             // issue
             for (int i = 0; i < 8; i++) begin
                 if (rs_table[i].ps1_ready && rs_table[i].ps2_ready 
-                    && fu_rdy && rs_table[i].valid) begin
+                    && fu_rdy) begin
                     valid_out <= 1'b1;
                     data_out <= rs_table[i];
                     rs_table[i].valid <= 1'b1;
@@ -169,6 +168,8 @@ module rs(
                     rs_table[i].func3 <= 3'b0;
                     rs_table[i].func7 <= 7'b0;
                     break;
+                end else begin
+                    valid_out <= 1'b0;
                 end
             end
         end
