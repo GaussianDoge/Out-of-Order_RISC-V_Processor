@@ -35,9 +35,9 @@ module checkpoint(
             if (branch_detect) begin
                 for (int i = 0; i < 4; i++) begin
                     if (!checkpont[i].valid) begin
-                        checkpoint.pc <= branch_pc;
-                        checkpoint.rob_ta <= branch_rob_tag;
-                        checkpoint.reg_rdy_table <= reg_rdy_snap_shot;
+                        checkpoint[i].pc <= branch_pc;
+                        checkpoint[i].rob_tag <= branch_rob_tag;
+                        checkpoint[i].reg_rdy_table <= reg_rdy_snap_shot;
                     end
                 end
             end
@@ -47,7 +47,7 @@ module checkpoint(
     always_comb begin
         if (mispredict) begin
             for (int i = 0; i < 4; i++) begin
-                if (checkpont[i].valid && checkpoint.rob_tag == mispredict_tag) begin
+                if (checkpoint[i].valid && checkpoint[i].rob_tag == mispredict_tag) begin
                     snapshot = checkpoint[i];
                     checkpoint_valid = 1'b1;
                     break;
