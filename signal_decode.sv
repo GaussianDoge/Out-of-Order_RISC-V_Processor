@@ -72,7 +72,7 @@ module signal_decode(
                 rs2 = instr[24:20];
                 rd = 5'b0;
                 ALUOp = 3'b000;
-                fu_alu = 1'b1;
+                fu_alu = 1'b0;
                 fu_mem = 1'b1;
                 fu_br = 1'b0;
                 func3 = instr[14:12];
@@ -84,7 +84,7 @@ module signal_decode(
                 rs2 = instr[24:20];
                 rd = 5'b0;
                 ALUOp = 3'b001;
-                fu_alu = 1'b1;
+                fu_alu = 1'b0;
                 fu_mem = 1'b0;
                 fu_br = 1'b1;
                 func3 = instr[14:12];

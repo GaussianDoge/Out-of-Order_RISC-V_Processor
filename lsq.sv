@@ -315,9 +315,9 @@ module lsq(
             task_temp_ptr = r_ptr;
             task_unissued_store = 1'b0;
             // Loop through LSQ
-            $display("******************Load ROB = %0d", rob_index);
+            $display("******************Load PC = %8h ROB = %0d", pc, rob_index);
             for (int i = 0; i <= 7; i++) begin
-                $display("Checking Rob = %0d", lsq_arr[task_temp_ptr].rob_tag);
+                $display("Checking PC = %8h Rob = %0d", lsq_arr[task_temp_ptr].pc, lsq_arr[task_temp_ptr].rob_tag);
                 if (lsq_arr[task_temp_ptr].pc < pc
                     && lsq_arr[task_temp_ptr].valid_data 
                     && lsq_arr[task_temp_ptr].store) begin
@@ -328,7 +328,7 @@ module lsq(
                         logic [31:0] offset;
                         if (func3 == 3'b100) begin // lbu
                             offset = 0;
-                        end else if (data_in.func3 == 3'b010) begin // lw
+                        end else if (func3 == 3'b010) begin // lw
                             offset = 3;
                         end
 
@@ -336,16 +336,17 @@ module lsq(
                         if (addr >= store_addr && addr + offset <= (store_addr + limit)) begin
                             // If address overlaps
                             // SW to LW (Word to Word) - Forward
-                                $display("LSQ: Load Forwarding from Store rob=%0d addr=0x%08h data=0x%08h To Load rob=%0d addr=0x%08h",
+                                $display("LSQ: Load Forwarding from Store rob=%0d addr=0x%0d data=0x%08h To Load rob=%0d addr=0x%0d",
                                 lsq_arr[task_temp_ptr].rob_tag, lsq_arr[task_temp_ptr].addr, lsq_arr[task_temp_ptr].ps2_data, rob_index, addr);
                             if (addr == store_addr && data_in.func3 == 3'b010 && is_word) begin
                                 forward_valid = 1'b1;
                                 load_data = lsq_arr[task_temp_ptr].ps2_data;
                                 load_from_mem = 1'b0;
+                                $display("Word to Word");
                                 break;
                             end
                             // SW/SH to LBU (Byte Extraction) - Forward as the byte is inside the store data
-                            else if (data_in.func3 == 3'b100) begin 
+                            else if (func3 == 3'b100) begin 
                                 forward_valid = 1'b1;
                                 load_from_mem = 1'b0;
                                 
@@ -356,6 +357,7 @@ module lsq(
                                     2'b10: load_data = {24'b0, lsq_arr[task_temp_ptr].ps2_data[23:16]};
                                     2'b11: load_data = {24'b0, lsq_arr[task_temp_ptr].ps2_data[31:24]};
                                 endcase
+                                $display("Byte Extraction");
                                 break;
                             end
                         end else if ((addr >= store_addr && addr <= (store_addr + limit)) 

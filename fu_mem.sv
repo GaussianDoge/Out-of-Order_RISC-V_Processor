@@ -47,6 +47,7 @@ module fu_mem(
     logic [4:0] forward_rob_index;
     logic fwd_valid;
     logic load_mem;
+    logic load_ready;
     
     always_comb begin
         // L-type and S-type instructions
@@ -196,6 +197,7 @@ module fu_mem(
         .lsq_load(lsq_load),
         
         .data_out(data_out),
+        .load_ready(load_ready),
         .valid(valid)
     );
     

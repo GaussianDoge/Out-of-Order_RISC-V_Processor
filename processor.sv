@@ -16,7 +16,7 @@ module processor(
             pc <= 32'd0;
         end else if (b_data_out.fu_b_done && b_data_out.jalr_bne_signal) begin
             pc <= b_data_out.pc;
-        end else if (frontend_valid_out && rename_ready_in && !mispredict) begin
+        end else if (pc <= 12 || frontend_valid_out && rename_ready_in && !mispredict) begin
             pc <= pc + 4;
         end
     end
