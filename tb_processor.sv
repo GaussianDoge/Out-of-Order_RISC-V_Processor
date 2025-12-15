@@ -18,64 +18,88 @@ module tb_processor;
         forever #5 clk = ~clk;
     end
 
-    // Main TB sequence: reset, (optional) program load, run, dump a0/a1
+    // -----------------------------------------------------------------------
+    // DEBUG: Runtime Monitor
+    // -----------------------------------------------------------------------
+    // This block prints the PC and ROB status every cycle.
+    // If the simulation is stuck in a loop, you will see the last printed PC.
+    always @(posedge clk) begin
+        if (!reset) begin
+            $display("Time: %0t | PC: %h | ROB Head: %0d | ROB Tail: %0d | LSQ Count: %0d", 
+                     $time, 
+                     dut.pc, 
+                     dut.u_rob.head, 
+                     dut.u_rob.ptr,  // Tail/Alloc pointer
+                     dut.dispatch_unit.lsq_dispatch_rob_tag // Or LSQ counter if available
+                    );
+        end
+    end
+
+    // -----------------------------------------------------------------------
+    // DEBUG: Combinational Loop Catcher (Glitch Detector)
+    // -----------------------------------------------------------------------
+    // If signals oscillate infinitely without time advancing, this might trigger.
+    // (Note: Most simulators just freeze, but this helps if there is 'delta' movement)
+    
+    // Monitors the LSQ 'full' signal which was causing issues earlier
+    always @(dut.dispatch_unit.lsq_alloc_valid_out) begin
+        if ($time > 230 && $time < 240) begin // Only check around the crash time
+             $display("[GLITCH] LSQ Alloc Valid changed to %b at time %0t (Delta cycle?)", 
+                      dut.dispatch_unit.lsq_alloc_valid_out, $time);
+        end
+    end
+
+    // -----------------------------------------------------------------------
+    // Main Sequence
+    // -----------------------------------------------------------------------
     initial begin
         // Assert reset
         reset = 1'b1;
-
-        // OPTIONAL: load program.mem into your instruction memory
-        // Adjust the hierarchical path and array name to match your fetch unit.
-        // For example, if your fetch module has:
-        //   reg [31:0] imem [0:255];
-        // inside instance fetch_unit inside frontend,
-        // you can uncomment and adjust this line:
-        //
-        // $readmemh("program.mem", dut.frontend_unit.fetch_unit.imem);
-        //
-        // If your fetch already calls $readmemh("program.mem", ...) internally,
-        // you don't need to do anything here.
-
-        // Hold reset for a few cycles
         repeat (2) @(posedge clk);
         reset = 1'b0;
+        $display("Reset de-asserted. Starting execution...");
 
-        // Let the program run for some cycles (adjust as needed)
-        repeat (1000) @(posedge clk);
+        // Run for a safe limit
+        // Use a loop instead of 'repeat' so we can see progress
+        for (int i = 0; i < 1000; i++) begin
+            @(posedge clk);
+            
+            // OPTIONAL: Stop if PC hits a weird value (like 0 after start) or specific address
+            // if (dut.pc == 32'h0000_0034) $display("--- Reached the Crash PC ---");
+        end
 
         // Dump a0 and a1 at the end
         dump_a0_a1();
-
+        $finish;
+    end
+    
+    // Safety Timeout: Force stop if simulation runs too long (prevents infinite waits)
+    initial begin
+        #10000; // 10,000 ns limit
+        $display("\n[ERROR] Simulation Timed Out! Force finishing.");
+        dump_a0_a1();
         $finish;
     end
 
-    // Task to dump the architectural a0/a1 using rename map + PRF
+    // Task to dump the architectural a0/a1
     task dump_a0_a1;
-        // Physical register indices for x10 (a0) and x11 (a1)
-        logic [6:0] pr_a0;
-        logic [6:0] pr_a1;
-
-        // Values in those physical registers
-        logic [31:0] val_a0;
-        logic [31:0] val_a1;
+        logic [6:0] pr_a0, pr_a1;
+        logic [31:0] val_a0, val_a1;
     begin
-        // RISC-V ABI: a0 = x10, a1 = x11
-        // rename_unit.map[arch_reg] -> physical reg ID (7 bits)
-        pr_a0 = dut.rename_unit.map[5'd10];
-        pr_a1 = dut.rename_unit.map[5'd11];
-
-        // Read the physical register file in PRF
+        pr_a0 = dut.rename_unit.map[5'd8];
+        pr_a1 = dut.rename_unit.map[5'd9];
         val_a0 = dut.PRF.phy_reg[pr_a0];
         val_a1 = dut.PRF.phy_reg[pr_a1];
 
         $display("=================================================");
-        $display("End of simulation register dump:");
+        $display("Register dump at time %0t:", $time);
         $display("  a0 (x10): phys %0d = 0x%08h (%0d)", pr_a0, val_a0, $signed(val_a0));
         $display("  a1 (x11): phys %0d = 0x%08h (%0d)", pr_a1, val_a1, $signed(val_a1));
         $display("=================================================");
     end
     endtask
 
-    // Waveform dump (for GTKWave, etc.)
+    // Waveform dump
     initial begin
         $dumpfile("tb_processor.vcd");
         $dumpvars(0, tb_processor);

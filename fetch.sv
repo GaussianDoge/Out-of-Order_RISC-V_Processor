@@ -58,7 +58,7 @@ module fetch(
         .reset      (reset),
         .mispredict (mispredict),
         
-        .valid_in   (valid_in_delayed),
+        .valid_in   (1'b1),
         .ready_in   (),
         .data_in    (data_next),
         
