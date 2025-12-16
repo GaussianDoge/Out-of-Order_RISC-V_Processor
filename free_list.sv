@@ -16,14 +16,14 @@ parameter int DEPTH = 128
     input logic mispredict,
     input logic [6:0] re_r_ptr,
     input logic [6:0] re_w_ptr,
-    input logic [6:0] re_list [0:DEPTH-1],
+    input logic [0:DEPTH-1] [6:0] re_list,
 
     output logic [6:0] r_ptr_out,
     output logic [6:0] w_ptr_out,
-    output logic [6:0] list_out [0:DEPTH-1]
+    output logic [0:DEPTH-1] [6:0] list_out 
 );
 
-    logic [6:0] list [0:DEPTH-1];
+    logic [0:DEPTH-1] [6:0] list;
     logic [6:0] w_ptr, r_ptr;
     logic [6:0] ctr;
     

@@ -125,4 +125,15 @@ package types_pkg;
         logic [127:0] reset_reg_rdy_table;
 
     } checkpoint;
+
+    typedef struct packed {
+        logic valid;
+        logic [31:0] pc;
+        logic [4:0] rob_tag;
+        logic [0:31] [6:0] re_map ;
+        logic [0:127] [6:0] re_list ;
+        logic [3:0] re_ctr;
+        logic [6:0] re_r_ptr;
+        logic [6:0] re_w_ptr;
+    } rename_checkpoint;
 endpackage 

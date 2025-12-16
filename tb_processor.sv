@@ -108,7 +108,7 @@ module tb_processor;
         pr_a1 = dut.rename_unit.map[5'd6];
         pr_a2 = dut.rename_unit.map[5'd7];
         pr_a3 = dut.rename_unit.map[5'd8];
-        pr_a4 = dut.rename_unit.map[5'd29];
+        pr_a4 = dut.rename_unit.map[5'd28];
 
         val_a0 = dut.PRF.phy_reg[pr_a0];
         val_a1 = dut.PRF.phy_reg[pr_a1];
