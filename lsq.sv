@@ -53,6 +53,7 @@ module lsq(
     logic [2:0] w_ptr; // write pointer points to the next free entry
     logic [2:0] r_ptr; // read/retire pointer points to the oldest valid entry
     logic [3:0] ctr; // counter for number of entries in LSQ
+    logic [2:0] new_w_ptr;
 
     logic [31:0] addr;
     assign addr = ps1_data + imm_in;
@@ -113,7 +114,6 @@ module lsq(
                 //     ctr <= new_ctr;
                 // end
 
-                logic [2:0] miss_ptr;
 
                 if (retired) begin
                     if (lsq_arr[r_ptr].valid_data && rob_head == lsq_arr[r_ptr].rob_tag && lsq_arr[r_ptr].store) begin
@@ -132,15 +132,17 @@ module lsq(
                 end
 
                 
-                miss_ptr = (w_ptr == 0) ? 7 : w_ptr - 1;
-                for (int i = 0; i < 8; i++) begin
-                    if (lsq_arr[miss_ptr].pc > mispredict_pc) begin
+                for (int i = 1; i < 8; i++) begin
+                    if (lsq_arr[w_ptr-i].pc >= mispredict_pc) begin
                         lsq_arr[i] <= '0;
-                        w_ptr <= miss_ptr;
+                        $display("Flush out PC: %8h Larger than PC: %8h", lsq_arr[w_ptr-i].pc, mispredict_pc);
+                        w_ptr <= w_ptr-i;
                     end
-                    miss_ptr = (w_ptr == 0) ? 7 : w_ptr - 1;
-                    $display("Flush out PC: %8h", lsq_arr[miss_ptr].pc);
                 end
+                
+
+                
+
 
             end else begin
                 store_lsq_done <= 1'b0;
