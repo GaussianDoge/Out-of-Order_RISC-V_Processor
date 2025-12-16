@@ -10,6 +10,7 @@ module processor(
     logic [31:0] pc;
     logic mispredict;
     logic [4:0] mispredict_tag;
+    logic [31:0] mispredict_pc;
     
     always_ff @(posedge clk) begin
         if (reset) begin
@@ -87,6 +88,7 @@ module processor(
        // From ROB
        .mispredict(mispredict),
        .mispredict_tag(mispredict_tag),
+       .hit(b_data_out.hit),
 
        // Output
        .checkpoint_valid(checkpoint_valid),
@@ -127,6 +129,7 @@ module processor(
     // Dispatch to LSQ
     logic dispatch_valid;
     logic [4:0] dispatch_rob_tag;
+    logic [31:0] lsq_dispatch_pc;
 
     // // PRF to RS (Set Readiness)
     // logic [6:0] rdy_reg1, rdy_reg2, rdy_reg3;
@@ -149,6 +152,7 @@ module processor(
         // Interface with LSQ
         .lsq_alloc_valid_out(dispatch_valid),
         .lsq_dispatch_rob_tag(dispatch_rob_tag),
+        .lsq_dispatch_pc(lsq_dispatch_pc),
         
         // Interface with PRF
         .query_ps1(dispatch_query_ps1), .query_ps2(dispatch_query_ps2),
@@ -175,7 +179,8 @@ module processor(
         
         // Global
         .mispredict(mispredict),
-        .mispredict_tag(mispredict_tag)
+        .mispredict_tag(mispredict_tag),
+        .mispredict_pc(mispredict_pc)
     );
 
     
@@ -214,6 +219,7 @@ module processor(
         // Outputs (Global Control & Commit)
         .mispredict(mispredict),
         .mispredict_tag(mispredict_tag),
+        .mispredict_pc(mispredict_pc),
 
         .valid_retired(rob_retire_valid),
         .preg_old(retire_pd_old), // Connect to Rename
@@ -360,6 +366,7 @@ module processor(
         // From Dispatch
         .dispatch_valid(dispatch_valid),
         .dispatch_rob_tag(dispatch_rob_tag),
+        .lsq_dispatch_pc(lsq_dispatch_pc),
 
         // From Reservation Stations
         .alu_issued(alu_issued), .alu_rs_data(alu_rs_data_out),
@@ -372,6 +379,7 @@ module processor(
         .curr_rob_tag(rob_alloc_ptr),
         .mispredict(mispredict),
         .mispredict_tag(mispredict_tag),
+        .mispredict_pc(mispredict_pc),
 
         // From PRF
         .ps1_alu_data(ps1_alu_data), .ps2_alu_data(ps2_alu_data),

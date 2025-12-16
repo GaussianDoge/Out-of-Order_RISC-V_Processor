@@ -30,6 +30,7 @@ module dispatch(
     // LSQ
     output logic lsq_alloc_valid_out,
     output logic [4:0] lsq_dispatch_rob_tag,
+    output logic [31:0] lsq_dispatch_pc,
 
     // Interface with PRF (Set Busy / Allocation)
     output logic [6:0] alu_nr_reg_out,
@@ -69,7 +70,8 @@ module dispatch(
 
     // Global
     input logic mispredict,
-    input logic [4:0] mispredict_tag
+    input logic [4:0] mispredict_tag,
+    input logic [31:0] mispredict_pc
 );
 
     // Routing Logic
@@ -132,7 +134,7 @@ module dispatch(
     );
 
     // Rename Stall Logic
-    assign ready_in = alu_buf_ready_in && b_buf_ready_in && lsu_buf_ready_in;
+    assign ready_in = alu_buf_ready_in && b_buf_ready_in && lsu_buf_ready_in && (lsu_rs_ready_in || !data_in.fu_mem);
     
     // Pre-buffer set destination to not ready
     wire dispatch_handshake = valid_in && ready_in;
@@ -146,7 +148,7 @@ module dispatch(
     assign lsu_nr_reg_out = data_in.pd_new;
     assign lsu_nr_valid_out = dispatch_handshake && is_mem && (data_in.pd_new != 7'd0) && !mispredict;
 
-    assign lsq_alloc_valid_out = (dispatch_packet.Opcode == 7'b0000011 || dispatch_packet.Opcode == 7'b0100011) && dispatch_handshake;
+    assign lsq_alloc_valid_out = (data_in.Opcode == 7'b0000011 || data_in.Opcode == 7'b0100011) && dispatch_handshake;
 
     // Priority Logic
     rename_data active_packet;
@@ -164,9 +166,11 @@ module dispatch(
 
         // LSQ dispatch rob tag
         if (lsq_alloc_valid_out) begin
-            lsq_dispatch_rob_tag = dispatch_packet.rob_index;
+            lsq_dispatch_rob_tag = data_in.rob_tag;
+            lsq_dispatch_pc = data_in.pc;
         end else begin
-            lsq_dispatch_rob_tag = 5'd0;
+            lsq_dispatch_rob_tag = '0;
+            lsq_dispatch_pc = '0;
         end
 
         if (alu_nr_valid_out) begin
@@ -213,7 +217,7 @@ module dispatch(
         dispatch_packet.pr1       = active_packet.ps1;
         dispatch_packet.pr2       = active_packet.ps2;
         dispatch_packet.imm       = active_packet.imm[31:0];
-        dispatch_packet.rob_index = rob_tag_in;
+        dispatch_packet.rob_index = active_packet.rob_tag;
 
         dispatch_packet.func3     = active_packet.func3;
         dispatch_packet.func7     = active_packet.func7;
@@ -248,7 +252,8 @@ module dispatch(
         .reg1_rdy(preg1_rdy), .reg2_rdy(preg2_rdy), .reg3_rdy(preg3_rdy),
         .reg1_rdy_valid(preg1_valid), .reg2_rdy_valid(preg2_valid), .reg3_rdy_valid(preg3_valid),
         .flush(mispredict),
-        .flush_tag(mispredict_tag)
+        .flush_tag(mispredict_tag),
+        .flush_pc(mispredict_pc)
     );
 
     // Branch RS
@@ -264,14 +269,15 @@ module dispatch(
         .reg1_rdy(preg1_rdy), .reg2_rdy(preg2_rdy), .reg3_rdy(preg3_rdy),
         .reg1_rdy_valid(preg1_valid), .reg2_rdy_valid(preg2_valid), .reg3_rdy_valid(preg3_valid),
         .flush(mispredict),
-        .flush_tag(mispredict_tag)
+        .flush_tag(mispredict_tag),
+        .flush_pc(mispredict_pc)
     );
 
     // LSU RS
     rs u_lsu_rs (
         .clk(clk),
         .reset(reset),
-        .fu_rdy(lsu_rs_ready_in),
+        .fu_rdy(1'b1),
         .valid_out(lsu_rs_valid_out),
         .data_out(lsu_rs_data_out),
         .valid_in(lsu_rs_write_en),
@@ -280,6 +286,7 @@ module dispatch(
         .reg1_rdy(preg1_rdy), .reg2_rdy(preg2_rdy), .reg3_rdy(preg3_rdy),
         .reg1_rdy_valid(preg1_valid), .reg2_rdy_valid(preg2_valid), .reg3_rdy_valid(preg3_valid),
         .flush(mispredict),
-        .flush_tag(mispredict_tag)
+        .flush_tag(mispredict_tag),
+        .flush_pc(mispredict_pc)
     );
 endmodule
