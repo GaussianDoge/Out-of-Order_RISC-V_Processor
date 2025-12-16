@@ -10,7 +10,7 @@ module fu_branch(
     
     // From RS
     input rs_data data_in,
-    input issued,
+    input logic issued,
     
     // From PRF
     input logic [31:0] ps1_data,
