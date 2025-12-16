@@ -33,22 +33,28 @@ module tb_processor;
 //                     dut.u_rob.ptr,  // Tail/Alloc pointer
 //                     dut.dispatch_unit.lsq_dispatch_rob_tag // Or LSQ counter if available
 //                    );
-            logic [6:0] pr_x7;
-            logic [31:0] val_x7;
-            logic [6:0] pr_x28;
-            logic [31:0] val_x28;
+            logic [6:0] pr_1;
+            logic [31:0] val_1;
+            logic [6:0] pr_2;
+            logic [31:0] val_2;
+            logic [31:0] mispredict_pc;
             
-            pr_x7 = dut.rename_unit.map[5'd7];
-            val_x7 = dut.PRF.phy_reg[pr_x7];
+            pr_1 = dut.rename_unit.map[5'd20];
+            val_1 = dut.PRF.phy_reg[pr_1];
+            pr_2 = dut.rename_unit.map[5'd18];
+            val_2 = dut.PRF.phy_reg[pr_2];
+            mispredict_pc = dut.mispredict_pc;
             
-            
-            pr_x28 = dut.rename_unit.map[5'd28];
-            val_x28 = dut.PRF.phy_reg[pr_x28];
 
             if (dut.mispredict) begin
                 $display("============= Mispredict #%0d =============", count);
-                $display("X7: phys %0d = 0x%08h (%0d)", pr_x7, val_x7, $signed(val_x7));
-                $display("X28: phys %0d = 0x%08h (%0d)", pr_x28, val_x28, $signed(val_x28));
+                if (mispredict_pc == 32'h68) begin
+                    $display("X20: phys %0d = 0x%08h (%0d)", pr_1, val_1, $signed(val_1));
+                end else if (mispredict_pc == 32'h78) begin
+                    $display("X18: phys %0d = 0x%08h (%0d)", pr_2, val_2, $signed(val_2));
+                end
+                
+                count += 1;
             end
         end
     end
@@ -104,11 +110,11 @@ module tb_processor;
         logic [6:0] pr_a0, pr_a1, pr_a2, pr_a3, pr_a4;
         logic [31:0] val_a0, val_a1, val_a2, val_a3, val_a4;
     begin
-        pr_a0 = dut.rename_unit.map[5'd1];
-        pr_a1 = dut.rename_unit.map[5'd9];
-        pr_a2 = dut.rename_unit.map[5'd10];
-        pr_a3 = dut.rename_unit.map[5'd11];
-        pr_a4 = dut.rename_unit.map[5'd29];
+        pr_a0 = dut.rename_unit.map[5'd10];
+        pr_a1 = dut.rename_unit.map[5'd11];
+        pr_a2 = dut.rename_unit.map[5'd24];
+        pr_a3 = dut.rename_unit.map[5'd24];
+        pr_a4 = dut.rename_unit.map[5'd31];
 
         val_a0 = dut.PRF.phy_reg[pr_a0];
         val_a1 = dut.PRF.phy_reg[pr_a1];
