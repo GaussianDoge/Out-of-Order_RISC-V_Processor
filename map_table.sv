@@ -10,8 +10,8 @@ module map_table(
     input logic [4:0] rd,
     input logic [6:0] pd_new,
     
-    input logic [6:0] re_map [0:31],
-    output logic [6:0] map [0:31]
+    input logic [0:31] [6:0] re_map,
+    output logic [0:31] [6:0] map 
 );
     always_ff @(posedge clk or posedge reset) begin
         if (reset) begin

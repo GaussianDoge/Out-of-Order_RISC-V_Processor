@@ -18,6 +18,8 @@ module rename(
     
     // Mispredict signal from ROB
     input logic mispredict,
+    input logic [4:0] mispredict_tag,
+    input logic hit,
     
     // Downstream
     output rename_data data_out,
@@ -40,16 +42,17 @@ module rename(
     // ROB Tag
     logic [3:0] ctr = 4'b0;
     
-    // Support mispeculation 
-    logic [6:0] re_map [0:31];
-    logic [6:0] re_list [0:127];
+    // Recovery
+    rename_checkpoint [4:0] checkpoint;
+    logic [0:31] [6:0] re_map;
+    logic [0:127] [6:0] re_list;
     logic [6:0] re_r_ptr;
     logic [6:0] re_w_ptr;
     
     logic [6:0] r_ptr_list;
     logic [6:0] w_ptr_list;
-    logic [6:0] list [0:127];
-    logic [6:0] map [0:31];
+    logic [0:127] [6:0] list;
+    logic [0:31] [6:0] map;
     
 
     // Speculation is 1 when we encounter a branch instruction
@@ -64,6 +67,21 @@ module rename(
     assign update_en = write_pd && rename_en;
 
     
+    always_comb begin
+        if (mispredict) begin
+            for (int i = 0; i < 5; i++) begin
+                if (checkpoint[i].valid && checkpoint[i].rob_tag == mispredict_tag) begin
+                    re_list = checkpoint[i].re_list;
+                    re_map = checkpoint[i].re_map;
+                    re_ctr = checkpoint[i].re_ctr;
+                    re_r_ptr = checkpoint[i].re_r_ptr;
+                    re_w_ptr = checkpoint[i].re_w_ptr;
+                    break;
+                end
+            end 
+            
+        end
+    end
         
     always_ff @(posedge clk or posedge reset) begin
         if (reset) begin
@@ -71,19 +89,45 @@ module rename(
             data_out <= '0;
             valid_out <= 1'b0;
             pre_pc <= 32'b1;
+            checkpoint <= '0;
         end else begin
             if (valid_out && ready_out) begin
                 valid_out <= 1'b0;
             end
             if (rename_en && (branch || jalr) && !mispredict) begin
-                re_list <= list;
-                re_map <= map;
-                re_ctr <= ctr;
-                re_r_ptr <= r_ptr_list;
-                re_w_ptr <= w_ptr_list;
+                // re_list <= list;
+                // re_map <= map;
+                // re_ctr <= ctr;
+                // re_r_ptr <= r_ptr_list;
+                // re_w_ptr <= w_ptr_list;
+                for (int i = 0; i < 4; i++) begin
+                    if (!checkpoint[i].valid) begin
+                        checkpoint[i].valid <= 1'b1;
+                        checkpoint[i].pc <= data_in.pc;
+                        checkpoint[i].rob_tag <= ctr;
+
+                        checkpoint[i].re_map <= map;
+                        checkpoint[i].re_list <= list;
+                        checkpoint[i].re_ctr <= ctr;
+                        checkpoint[i].re_r_ptr <= r_ptr_list;
+                        checkpoint[i].re_w_ptr <= w_ptr_list;
+                        break; // Stop after filling one slot
+                    end 
+                end
+
             end
-            if (mispredict) begin
-                ctr <= (re_ctr == 15) ? 0 : re_ctr + 1;
+            if (mispredict || hit) begin
+                for (int i = 0; i < 5; i++) begin
+                    if (checkpoint[i].valid && checkpoint[i].rob_tag == mispredict_tag) begin
+                        checkpoint[i] <= '0;
+                        break;
+                    end
+                end 
+
+                if (mispredict) begin
+                    ctr <= (re_ctr == 15) ? 0 : re_ctr + 1;
+                end
+                
             end else if (rename_en) begin
                 ctr <= (ctr == 15) ? 0 : ctr + 1;
                 data_out.pc <= data_in.pc;

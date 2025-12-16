@@ -53,6 +53,8 @@ module processor(
         .data_in(frontend_data_out),
         .ready_in(rename_ready_in),
         .mispredict(mispredict),
+        .mispredict_tag(mispredict_tag),
+        .hit(b_data_out.hit),
         .data_out(rename_data_out),
         .valid_out(rename_valid_out),
         .ready_out(dispatch_ready_in),

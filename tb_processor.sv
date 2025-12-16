@@ -15,7 +15,7 @@ module tb_processor;
     // Clock generation: 100 MHz (10 ns period)
     initial begin
         clk = 1'b0;
-        forever #5 clk = ~clk;
+        forever #4 clk = ~clk;
     end
 
     // -----------------------------------------------------------------------
@@ -104,10 +104,10 @@ module tb_processor;
         logic [6:0] pr_a0, pr_a1, pr_a2, pr_a3, pr_a4;
         logic [31:0] val_a0, val_a1, val_a2, val_a3, val_a4;
     begin
-        pr_a0 = dut.rename_unit.map[5'd5];
-        pr_a1 = dut.rename_unit.map[5'd6];
-        pr_a2 = dut.rename_unit.map[5'd7];
-        pr_a3 = dut.rename_unit.map[5'd8];
+        pr_a0 = dut.rename_unit.map[5'd1];
+        pr_a1 = dut.rename_unit.map[5'd9];
+        pr_a2 = dut.rename_unit.map[5'd10];
+        pr_a3 = dut.rename_unit.map[5'd28];
         pr_a4 = dut.rename_unit.map[5'd29];
 
         val_a0 = dut.PRF.phy_reg[pr_a0];
