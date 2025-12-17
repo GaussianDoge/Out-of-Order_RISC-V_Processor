@@ -43,7 +43,7 @@ module rename(
     logic [3:0] ctr = 4'b0;
     
     // Recovery
-    rename_checkpoint [4:0] checkpoint;
+    rename_checkpoint [7:0] checkpoint;
     logic [0:31] [6:0] re_map;
     logic [0:127] [6:0] re_list;
     logic [6:0] re_r_ptr;
@@ -55,7 +55,8 @@ module rename(
     logic [0:31] [6:0] map;
 
     logic capture;
-    logic [4:0] index;
+    logic [3:0] index;
+    logic [3:0] oldest;
     
 
     // Speculation is 1 when we encounter a branch instruction
@@ -73,7 +74,7 @@ module rename(
     always_comb begin
         if (mispredict) begin
             pre_pc = data_in.pc;
-            for (int i = 0; i < 5; i++) begin
+            for (int i = 0; i < 8; i++) begin
                 if (checkpoint[i].valid && checkpoint[i].rob_tag == mispredict_tag) begin
                     re_list = checkpoint[i].re_list;
                     re_map = checkpoint[i].re_map;
@@ -96,6 +97,7 @@ module rename(
             checkpoint <= '0;
             capture <= 1'b0;
             index <= '0;
+            oldest <= '0;
         end else begin
             if (valid_out && ready_out) begin
                 valid_out <= 1'b0;
@@ -109,7 +111,7 @@ module rename(
 
                 capture <= jalr;
 
-                for (int i = 0; i < 4; i++) begin
+                for (int i = 0; i < 8; i++) begin
                     if (!checkpoint[i].valid) begin
                         checkpoint[i].valid <= 1'b1;
                         checkpoint[i].pc <= data_in.pc;
@@ -128,20 +130,22 @@ module rename(
             end
 
             if (capture) begin
-
                 checkpoint[index].re_map <= map;
                 //checkpoint[index].re_list <= list;
                 //checkpoint[index].re_ctr <= ctr;
                 //checkpoint[index].re_r_ptr <= r_ptr_list;
                 //checkpoint[index].re_w_ptr <= w_ptr_list;
-
                 capture <= 1'b0;
             end
 
-            if (mispredict || hit) begin
-                for (int i = 0; i < 5; i++) begin
+            if (mispredict) begin
+                for (int i = 0; i < 8; i++) begin
                     if (checkpoint[i].valid && checkpoint[i].rob_tag == mispredict_tag) begin
-                        checkpoint[i] <= '0;
+                        if (i == oldest) begin
+                            checkpoint <= '0;
+                        end else begin
+                            checkpoint[i] <= '0;
+                        end
                         break;
                     end
                 end 
@@ -150,6 +154,14 @@ module rename(
                     ctr <= (re_ctr == 15) ? 0 : re_ctr + 1;
                 end
                 
+            end else if (hit) begin
+                for (int i = 0; i < 8; i++) begin
+                    if (checkpoint[i].valid && checkpoint[i].rob_tag == mispredict_tag) begin
+                        checkpoint[i] <= '0;
+                        oldest <= oldest+1;
+                        break;
+                    end
+                end 
             end else if (rename_en) begin
                 ctr <= (ctr == 15) ? 0 : ctr + 1;
                 data_out.pc <= data_in.pc;

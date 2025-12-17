@@ -37,13 +37,23 @@ module tb_processor;
             logic [31:0] val_1;
             logic [6:0] pr_2;
             logic [31:0] val_2;
+            logic [6:0] pr_3;
+            logic [31:0] val_3;
             logic [31:0] mispredict_pc;
+            
+            logic [31:0] ps1, ps2;
+            logic hit;
             
             pr_1 = dut.rename_unit.map[5'd20];
             val_1 = dut.PRF.phy_reg[pr_1];
             pr_2 = dut.rename_unit.map[5'd18];
             val_2 = dut.PRF.phy_reg[pr_2];
+            pr_3 = dut.rename_unit.map[5'd28];
+            val_3 = dut.PRF.phy_reg[pr_3];
             mispredict_pc = dut.mispredict_pc;
+            
+            ps1 = dut.fu.u_branch.ps1_data;
+            ps2 = dut.fu.u_branch.ps2_data;
             
 
             if (dut.mispredict) begin
@@ -52,6 +62,9 @@ module tb_processor;
                     $display("X20: phys %0d = 0x%08h (%0d)", pr_1, val_1, $signed(val_1));
                 end else if (mispredict_pc == 32'h78) begin
                     $display("X18: phys %0d = 0x%08h (%0d)", pr_2, val_2, $signed(val_2));
+                end else if (mispredict_pc == 32'hb8) begin
+                    $display("X28: phys %0d = 0x%08h (%0d)", pr_3, val_3, $signed(val_3));
+                    $display("PS1: %d   PS2: %d", ps1, ps2);
                 end
                 
                 count += 1;
@@ -106,15 +119,16 @@ module tb_processor;
 //    end
 
     // Task to dump the architectural a0/a1
+    logic [2:0] a = 3'b0;
     task dump_a0_a1;
         logic [6:0] pr_a0, pr_a1, pr_a2, pr_a3, pr_a4;
         logic [31:0] val_a0, val_a1, val_a2, val_a3, val_a4;
     begin
-        pr_a0 = dut.rename_unit.map[5'd10];
-        pr_a1 = dut.rename_unit.map[5'd11];
-        pr_a2 = dut.rename_unit.map[5'd24];
-        pr_a3 = dut.rename_unit.map[5'd24];
-        pr_a4 = dut.rename_unit.map[5'd31];
+        pr_a0 = dut.rename_unit.map[5'd1];
+        pr_a1 = dut.rename_unit.map[5'd6];
+        pr_a2 = dut.rename_unit.map[5'd7];
+        pr_a3 = dut.rename_unit.map[5'd10];
+        pr_a4 = dut.rename_unit.map[5'd11];
 
         val_a0 = dut.PRF.phy_reg[pr_a0];
         val_a1 = dut.PRF.phy_reg[pr_a1];
@@ -130,6 +144,7 @@ module tb_processor;
         $display("  phys %0d = 0x%08h (%0d)", pr_a3, val_a3, $signed(val_a3));
         $display("  phys %0d = 0x%08h (%0d)", pr_a4, val_a4, $signed(val_a4));
         $display("=================================================");
+        $display("%0d", (a-1));
     end
     endtask
 

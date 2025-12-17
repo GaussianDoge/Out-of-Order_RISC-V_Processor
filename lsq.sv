@@ -113,6 +113,11 @@ module lsq(
                 // end else begin
                 //     ctr <= new_ctr;
                 // end
+                logic [2:0] tmp_wptr;
+                logic       stop;
+
+                tmp_wptr = w_ptr;
+                stop     = 1'b0;
 
 
                 if (retired) begin
@@ -131,14 +136,64 @@ module lsq(
                     end
                 end
 
+                if (issued && data_in.pc < mispredict_pc) begin
+                    // Update store data in LSQ
+                    for (int i = 0; i <= 7; i++) begin
+                        if (lsq_arr[i].valid 
+                        && !lsq_arr[i].valid_data 
+                        && lsq_arr[i].rob_tag == data_in.rob_index) begin
+                            lsq_arr[i].addr <= ps1_data + imm_in;
+                            lsq_arr[i].pc <= data_in.pc;
+                            lsq_arr[i].ps2_data <= ps2_data;
+                            lsq_arr[i].valid_data <= 1'b1;
+                            lsq_arr[i].pd <= data_in.pd;
+                            lsq_arr[i].func3 <= data_in.func3;
+
+                            if (data_in.Opcode == 7'b0100011) begin // store
+                                lsq_arr[i].store <= 1'b1;
+                                if (data_in.func3 == 3'b010) begin // sw
+                                    lsq_arr[i].sw_sh_signal <= 1'b0;
+                                end else if (data_in.func3 == 3'b001) begin // sh
+                                    lsq_arr[i].sw_sh_signal <= 1'b1;
+                                end
+                                store_rob_tag <= data_in.rob_index;
+                                store_lsq_done <= 1'b1;
+                            end else begin // load
+                                lsq_arr[i].store <= 1'b0;
+                            end
+                            
+                        end
+                    end
+                end 
+
                 
-                for (int i = 1; i < 8; i++) begin
-                    if (lsq_arr[w_ptr-i].pc >= mispredict_pc) begin
-                        lsq_arr[i] <= '0;
-                        $display("Flush out PC: %8h Larger than PC: %8h", lsq_arr[w_ptr-i].pc, mispredict_pc);
-                        w_ptr <= w_ptr-i;
+                // for (int i = 1; i < 8; i++) begin
+                //     if (lsq_arr[w_ptr-i].pc >= mispredict_pc) begin
+                //         lsq_arr[i] <= '0;
+                //         $display("Flush out PC: %8h Larger than PC: %8h", lsq_arr[w_ptr-i].pc, mispredict_pc);
+                //         w_ptr <= w_ptr-i;
+                //     end
+                // end
+                
+
+                for (int k = 0; k < 8; k++) begin
+                    logic [2:0] last;
+                    last = tmp_wptr - 3'd1;   // wraps correctly when tmp_wptr==0 -> last==7
+
+                    if (!stop) begin
+                        if (lsq_arr[last].valid && (lsq_arr[last].pc >= mispredict_pc)) begin
+                            $display("Flush out PC: %8h Larger than PC: %8h",
+                                    lsq_arr[last].pc, mispredict_pc);
+                            lsq_arr[last] <= '0;   // clear the entry you checked
+                            tmp_wptr = last;       // move next-free back by 1
+                        end else begin
+                            stop = 1'b1;           // stop after first non-flushable tail entry
+                        end
                     end
                 end
+
+                w_ptr <= tmp_wptr;                 // update once
+
                 
 
                 
