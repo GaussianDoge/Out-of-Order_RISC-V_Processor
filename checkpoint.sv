@@ -24,17 +24,33 @@ module checkpoint(
 );
     // 4 Checkpoints
     checkpoint [7:0] chkpt;
+    logic [2:0] oldest;
 
     always_ff @(posedge clk) begin
         if (reset) begin
             chkpt <= '0;
+            oldest <= '0;
         end else begin
 //            checkpoint_valid <= 1'b0;
             // When a new branch is renamed/dispatched
-            if (mispredict || hit) begin
+            if (mispredict) begin
+                for (int i = 0; i < 8; i++) begin
+                    if (chkpt[i].valid && chkpt[i].rob_tag == mispredict_tag) begin
+                        if (i == oldest) begin
+                            chkpt <= '0;
+                            oldest <= '0;
+                        end else begin
+                            chkpt[i] <= '0;
+                        end
+                        
+                        break;
+                    end
+                end
+            end else if (hit) begin
                 for (int i = 0; i < 8; i++) begin
                     if (chkpt[i].valid && chkpt[i].rob_tag == mispredict_tag) begin
                         chkpt[i] <= '0;
+                        oldest <= oldest+1;
                         break;
                     end
                 end

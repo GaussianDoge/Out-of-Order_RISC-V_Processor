@@ -143,6 +143,7 @@ module rename(
                     if (checkpoint[i].valid && checkpoint[i].rob_tag == mispredict_tag) begin
                         if (i == oldest) begin
                             checkpoint <= '0;
+                            oldest <= '0;
                         end else begin
                             checkpoint[i] <= '0;
                         end
