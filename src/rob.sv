@@ -82,18 +82,39 @@ module rob (
             if (store_lsq_done && rob_table[store_rob_tag].valid) begin
                 rob_table[store_rob_tag].complete <= 1'b1;
             end
+//            // Mispredict operation
+//            if (br_mispredict) begin
+//                automatic logic [3:0] old_w = w_ptr;            
+//                automatic logic [3:0] re_ptr = (br_mispredict_tag==15)?0:br_mispredict_tag+1;  
+//                automatic logic [3:0] newcnt = (re_ptr >= r_ptr) ? (re_ptr - r_ptr) : (4'd15 - r_ptr + re_ptr);
+        
+//                for (logic [3:0] i=re_ptr; i!=old_w; i=(i==15)?0:i+1) begin
+//                    rob_table[i] <= '0;
+//                end
+                
+//                w_ptr <= re_ptr;
+//                ctr <= newcnt;
+//            end
+
             // Mispredict operation
             if (br_mispredict) begin
-                automatic logic [3:0] old_w = w_ptr;            
-                automatic logic [3:0] re_ptr = (br_mispredict_tag==15)?0:br_mispredict_tag+1;  
-                automatic logic [3:0] newcnt = (re_ptr >= r_ptr) ? (re_ptr - r_ptr) : (4'd15 - r_ptr + re_ptr);
-        
-                for (logic [3:0] i=re_ptr; i!=old_w; i=(i==15)?0:i+1) begin
-                    rob_table[i] <= '0;
+                logic [3:0] old_w;
+                logic [3:0] re_ptr;
+                logic [3:0] newcnt;
+            
+                old_w  = w_ptr;
+                re_ptr = br_mispredict_tag[3:0] + 4'd1;  // wraps naturally in 4 bits
+                newcnt = re_ptr - r_ptr;                 // (re_ptr - r_ptr) mod 16
+            
+                // statically bounded loop (synthesizable)
+                for (int j = 0; j < 16; j++) begin
+                    if (in_flush_region(j[3:0], re_ptr, old_w)) begin
+                        rob_table[j] <= '0;
+                    end
                 end
-                
+            
                 w_ptr <= re_ptr;
-                ctr <= newcnt;
+                ctr   <= newcnt;
             end
             else begin
                 // inform reservation station an instruction is retired, 
@@ -124,4 +145,15 @@ module rob (
             end
         end
     end
+    
+    // Returns 1 if idx is in the circular half-open interval [start, end_excl)
+    function automatic logic in_flush_region(
+        input logic [3:0] idx,
+        input logic [3:0] start,
+        input logic [3:0] end_excl
+    );
+        if (start == end_excl)       in_flush_region = 1'b0;
+        else if (start < end_excl)   in_flush_region = (idx >= start) && (idx < end_excl);
+        else                         in_flush_region = (idx >= start) || (idx < end_excl);
+    endfunction
 endmodule

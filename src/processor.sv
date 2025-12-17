@@ -3,7 +3,8 @@ import types_pkg::*;
 
 module processor(
     input logic clk,
-    input logic reset
+    input logic reset,
+    output logic cpu
     );
     
     // General Signals

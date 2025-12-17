@@ -1,7 +1,9 @@
 `timescale 1ns / 1ps
 import types_pkg::*;
 
-module data_memory(
+module data_memory#(
+parameter int DEPTH = 2048 //204800
+)(
     input clk,
     input reset,
     
@@ -30,7 +32,7 @@ module data_memory(
     assign func3 = data_in.func3;
     assign rob_index = data_in.rob_index;
 
-    logic [0:204800] [7:0]data_mem= '0; // 200 KB memory
+    logic [7:0] data_mem [0:DEPTH]; // 200 KB memory
     // logic valid_2cycles;
     logic [31:0] addr_reg;
     // logic [2:0]  func3_reg;
@@ -46,9 +48,9 @@ module data_memory(
             valid <= 1'b0;
             // valid_2cycles <= 1'b0;
             pre_rob_index <= 5'b11111;
-            for (int i = 0; i <= 204800; i++) begin
-                data_mem[i] <= '0;
-            end
+//            for (int i = 0; i <= DEPTH; i++) begin
+//                data_mem[i] <= '0;
+//            end
         end else begin
             valid <= 1'b0;
             load_ready <= 1'b1;
