@@ -182,8 +182,8 @@ module lsq(
 
                     if (!stop) begin
                         if (lsq_arr[last].valid && (lsq_arr[last].pc >= mispredict_pc)) begin
-                            $display("Flush out PC: %8h Larger than PC: %8h",
-                                    lsq_arr[last].pc, mispredict_pc);
+                            // $display("Flush out PC: %8h Larger than PC: %8h",
+                            //         lsq_arr[last].pc, mispredict_pc);
                             lsq_arr[last] <= '0;   // clear the entry you checked
                             tmp_wptr = last;       // move next-free back by 1
                         end else begin
