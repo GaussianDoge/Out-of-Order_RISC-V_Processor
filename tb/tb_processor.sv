@@ -124,6 +124,16 @@ module tb_processor;
     bit          started;
     bit          changed;
 
+    // ----------------------------
+    // Fetch-based CPI tracking
+    // CPI here is defined as: (instructions fetched from fetch.sv) / (cycles until last arch-reg update)
+    // Note: counting uses fetch valid/ready handshake so each instruction is counted once even under backpressure.
+    // ----------------------------
+    int unsigned fetch_instr_total;            // total fetch transfers (valid_out && ready_out)
+    int unsigned fetch_valid_cycles_total;     // cycles where valid_out is high (debug)
+    int unsigned fetch_instr_at_last_change;   // snapshot at last arch-reg update cycle
+    int unsigned fetch_valid_at_last_change;   // snapshot at last arch-reg update cycle (debug)
+
     localparam int unsigned STABLE_WINDOW = 20;
     localparam int unsigned MAX_CYCLES    = 200000; // safety cap
 
@@ -137,6 +147,12 @@ module tb_processor;
         stable_count = 0;
         start_cycle = 0;
         last_change_cycle = 0;
+        // init fetch-based CPI counters
+        fetch_instr_total          = 0;
+        fetch_valid_cycles_total   = 0;
+        fetch_instr_at_last_change = 0;
+        fetch_valid_at_last_change = 0;
+
 
         // init prev snapshot
         for (int r = 0; r < 32; r++) prev_arch[r] = '0;
@@ -162,6 +178,18 @@ module tb_processor;
             @(posedge clk);
             cycle++;
 
+            // -----------------------------------------
+            // Fetch-based instruction counting (from fetch.sv)
+            // Count a fetch when it handshakes to the next stage: valid_out && ready_out
+            // -----------------------------------------
+            if (dut.frontend_unit.fetch_unit.valid_out) begin
+                fetch_valid_cycles_total++;
+            end
+            if (dut.frontend_unit.fetch_unit.valid_out && dut.frontend_unit.fetch_unit.ready_out) begin
+                fetch_instr_total++;
+            end
+
+
             // read current snapshot
             for (int r = 0; r < 32; r++) curr_arch[r] = read_arch_val(r);
 
@@ -175,6 +203,11 @@ module tb_processor;
                 last_change_cycle = cycle;
                 stable_count = 0;
 
+                // snapshot fetch counters at last architectural register update cycle
+                fetch_instr_at_last_change = fetch_instr_total;
+                fetch_valid_at_last_change = fetch_valid_cycles_total;
+
+
                 // update prev snapshot
                 for (int r = 0; r < 32; r++) prev_arch[r] = curr_arch[r];
             end else begin
@@ -185,6 +218,10 @@ module tb_processor;
             if (stable_count >= STABLE_WINDOW) begin
                 int unsigned cycles_to_last_update;
                 int unsigned cycles_to_stable;
+                int unsigned active_cycles;
+                real         ipc;
+                real         cpi;
+
 
                 cycles_to_last_update = last_change_cycle - start_cycle;
                 cycles_to_stable      = cycle - start_cycle;
@@ -197,6 +234,35 @@ module tb_processor;
                          cycle, cycles_to_stable);
                 $display("Condition: no arch-reg changes for    %0d consecutive cycles", STABLE_WINDOW);
                 $display("=========================================================\n");
+
+                // ----------------------------
+                // Fetch-based CPI (user-defined)
+                // CPI = (# instructions fetched from fetch.sv) / (cycles until last arch-reg update)
+                // We count a fetched instruction when fetch_unit handshakes to downstream: valid_out && ready_out
+                // ----------------------------
+                active_cycles = (last_change_cycle >= start_cycle) ? (last_change_cycle - start_cycle + 1) : 0;
+
+                if (active_cycles != 0)
+                    ipc = real'(fetch_instr_at_last_change) / real'(active_cycles);
+                else
+                    ipc = 0.0;
+
+                if (fetch_instr_at_last_change != 0)
+                    cpi = real'(active_cycles) / real'(fetch_instr_at_last_change);
+                else
+                    cpi = 0.0;
+
+                $display("---- Fetch-based CPI / IPC (from fetch.sv) ----");
+                $display("Active cycles (inclusive):                 %0d", active_cycles);
+                $display("Instruction count (valid&&ready) @ last update: %0d", fetch_instr_at_last_change);
+                $display("Fetch-valid cycles @ last update (debug):  %0d", fetch_valid_at_last_change);
+                if ((fetch_instr_at_last_change != 0) && (active_cycles != 0)) begin
+                    $display("IPC (instructions/cycle):                  %0.4f", ipc);
+                    $display("CPI (cycles/instruction):                  %0.4f", cpi);
+                end else begin
+                    $display("IPC / CPI: N/A (no instructions counted or no active cycles)");
+                end
+                $display("----------------------------------------------\n");
 
                 dump_arch_regs("FINAL REGISTER STATE");
                 $finish;
