@@ -92,7 +92,7 @@ module lsq(
             store_lsq_done <= 1'b0;
 
             // Reserve position for load and store in LSQ in order (from dispatch buffer)
-            if (dispatch_valid && !tag_full) begin
+            if (dispatch_valid && !tag_full && !mispredict) begin
                 lsq_arr[w_ptr].valid <= 1'b1;
                 lsq_arr[w_ptr].addr <= '0;
                 lsq_arr[w_ptr].pc <= dispatch_pc;
