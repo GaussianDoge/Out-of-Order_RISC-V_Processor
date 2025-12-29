@@ -9,9 +9,6 @@ Designed for **simulation in Vivado XSim** and **synthesizable RTL** workflows.
 
 ## Results
 
-### Simulation Results (program with multiple stores, loads, and loops)
-![Simulation Results](./public/simulation_results.png)
-
 ### Synthesis Resource Report
 ![Resource Utilization](./public/utilization_table.png)
 
